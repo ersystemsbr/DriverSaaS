@@ -1,7 +1,16 @@
 import React from 'react';
-import { Car, Shield, User, DollarSign, CheckCircle2, ArrowRight, ShieldCheck, FileText, ChevronRight, Settings } from 'lucide-react';
+import { Car, Shield, User, DollarSign, CheckCircle2, ChevronRight, ShieldCheck, Sparkles } from 'lucide-react';
 
-export default function Home({ setActivePage, setCurrentRole }) {
+export default function Home({ setActivePage, setCurrentRole, setSelectedLoginRole }) {
+  
+  const handleSelectRole = (role) => {
+    setCurrentRole(role);
+    if (setSelectedLoginRole) {
+      setSelectedLoginRole(role);
+    }
+    setActivePage('login');
+  };
+
   return (
     <div className="min-h-screen bg-[#09090b] text-white">
       
@@ -66,51 +75,24 @@ export default function Home({ setActivePage, setCurrentRole }) {
 
         </div>
 
-        {/* Main CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3.5 w-full max-w-md">
+        {/* Main CTA Buttons - EXCLUSIVAMENTE DUAS OPÇÕES */}
+        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
           <button
-            onClick={() => {
-              setCurrentRole('driver');
-              setActivePage('driver_dashboard');
-            }}
+            onClick={() => handleSelectRole('driver')}
             className="flex-1 py-4 px-6 rounded-2xl bg-green-500 hover:bg-green-600 text-black font-extrabold text-base flex items-center justify-center gap-2 shadow-xl shadow-green-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Car className="w-5 h-5 text-black" />
+            <Car className="w-5 h-5 text-black stroke-[2.5px]" />
             <span>Sou Motorista</span>
             <ChevronRight className="w-5 h-5 text-black ml-auto" />
           </button>
 
           <button
-            onClick={() => {
-              setCurrentRole('passenger');
-              setActivePage('passenger_home');
-            }}
+            onClick={() => handleSelectRole('passenger')}
             className="flex-1 py-4 px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-bold text-base flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <User className="w-5 h-5 text-zinc-400" />
             <span>Sou Passageiro</span>
             <ChevronRight className="w-5 h-5 text-zinc-400 ml-auto" />
-          </button>
-        </div>
-
-        {/* Secondary Links */}
-        <div className="flex items-center gap-6 mt-8 text-xs text-zinc-400">
-          <button 
-            onClick={() => setActivePage('onboarding')}
-            className="hover:text-green-400 transition-colors underline"
-          >
-            Cadastrar Novo Motorista (Onboarding)
-          </button>
-          <span>•</span>
-          <button 
-            onClick={() => {
-              setCurrentRole('admin');
-              setActivePage('admin_dashboard');
-            }}
-            className="hover:text-amber-400 transition-colors flex items-center gap-1"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            Painel Gerencial
           </button>
         </div>
 

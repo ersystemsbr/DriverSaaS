@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { ShieldCheck, User, Car, DollarSign, ArrowRight, ArrowLeft, CheckCircle2, Building2 } from 'lucide-react';
 
-export default function OnboardingDriver({ driver, setDriver, setActivePage }) {
+export default function OnboardingDriver({ driver, setDriver, setActivePage, onRegisterSuccess }) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     full_name: driver.full_name || '',
     phone: driver.phone || '',
     email: driver.email || '',
+    password: '',
+    confirmPassword: '',
     
     // Escudo Jurídico PJ Amplo
     company_type: driver.company_type || 'ME', // MEI, ME, LTDA, SLU, EIRELI
@@ -35,8 +37,12 @@ export default function OnboardingDriver({ driver, setDriver, setActivePage }) {
 
   const handleNext = () => {
     if (step === 1) {
-      if (!formData.full_name || !formData.phone) {
-        setErrorMsg('Por favor, informe seu nome completo e telefone/WhatsApp.');
+      if (!formData.full_name || !formData.phone || !formData.email) {
+        setErrorMsg('Por favor, preencha todos os campos pessoais obrigatórios.');
+        return;
+      }
+      if (formData.password && formData.password !== formData.confirmPassword) {
+        setErrorMsg('As senhas digitadas não coincidem.');
         return;
       }
     } else if (step === 2) {
@@ -54,12 +60,21 @@ export default function OnboardingDriver({ driver, setDriver, setActivePage }) {
   };
 
   const handleFinish = () => {
-    setDriver(prev => ({
-      ...prev,
+    const updatedDriver = {
+      ...driver,
       ...formData,
       base_price: parseFloat(formData.base_price),
       price_per_km: parseFloat(formData.price_per_km)
-    }));
+    };
+    setDriver(updatedDriver);
+    if (onRegisterSuccess) {
+      onRegisterSuccess({
+        name: formData.full_name,
+        email: formData.email,
+        phone: formData.phone,
+        role: 'driver'
+      });
+    }
     setActivePage('driver_dashboard');
   };
 
@@ -130,6 +145,29 @@ export default function OnboardingDriver({ driver, setDriver, setActivePage }) {
                   onChange={(e) => handleChange('email', e.target.value)}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-green-500 transition-colors"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Senha de Acesso</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => handleChange('password', e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-green-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1">Confirmar Senha</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-green-500 transition-colors"
+                  />
+                </div>
               </div>
             </div>
           </div>
