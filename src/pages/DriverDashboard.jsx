@@ -28,7 +28,7 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
   const [notificationMsg, setNotificationMsg] = useState('');
   const [driverCoords, setDriverCoords] = useState({ lat: -23.561684, lng: -46.655981 });
 
-  const isSubActive = driver.subscription_status === 'active';
+  const isSubActive = driver?.subscription_status === 'active';
 
   // 1. Detectar GPS real do motorista no carregamento
   useEffect(() => {
@@ -214,7 +214,7 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
           <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-zinc-400">
               <ShieldCheck className="w-4 h-4 text-green-400" />
-              <span>Assinatura <strong className="text-white">Plano Mensal</strong> ativa até {new Date(driver.subscription_expires_at).toLocaleDateString('pt-BR')}</span>
+              <span>Assinatura <strong className="text-white">Plano {driver?.current_plan === 'daily' ? 'Diário' : driver?.current_plan === 'weekly' ? 'Semanal' : driver?.current_plan === 'yearly' ? 'Anual' : 'Mensal'}</strong> ativa até {new Date(driver?.subscription_expires_at || Date.now()).toLocaleDateString('pt-BR')}</span>
             </div>
             <button
               onClick={() => setActivePage('subscription')}
@@ -343,29 +343,29 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
           
           <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80">
             <span className="text-[11px] font-semibold text-zinc-400 block mb-1">Corridas Hoje</span>
-            <span className="text-2xl font-black text-white">{driver.today_rides}</span>
-            <span className="text-[10px] text-green-400 block mt-1">+2 vs ontem</span>
+            <span className="text-2xl font-black text-white">{driver?.today_rides || 0}</span>
+            <span className="text-[10px] text-green-400 block mt-1">Viagens realizadas</span>
           </div>
 
           <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80">
             <span className="text-[11px] font-semibold text-zinc-400 block mb-1">Faturamento Hoje</span>
-            <span className="text-2xl font-black text-green-400">R$ {driver.today_earnings.toFixed(2)}</span>
+            <span className="text-2xl font-black text-green-400">R$ {(driver?.today_earnings || 0).toFixed(2)}</span>
             <span className="text-[10px] text-zinc-500 block mt-1">100% livre de taxas</span>
           </div>
 
           <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80">
             <span className="text-[11px] font-semibold text-zinc-400 block mb-1">Total Acumulado</span>
-            <span className="text-2xl font-black text-white">R$ {(driver.total_earnings / 1000).toFixed(1)}k</span>
-            <span className="text-[10px] text-zinc-500 block mt-1">Total de {driver.total_rides} corridas</span>
+            <span className="text-2xl font-black text-white">R$ {((driver?.total_earnings || 0) / 1000).toFixed(1)}k</span>
+            <span className="text-[10px] text-zinc-500 block mt-1">Total de {driver?.total_rides || 0} corridas</span>
           </div>
 
           <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80">
             <span className="text-[11px] font-semibold text-zinc-400 block mb-1">Sua Avaliação</span>
             <div className="flex items-center gap-1.5">
-              <span className="text-2xl font-black text-white">{driver.rating}</span>
+              <span className="text-2xl font-black text-white">{driver?.rating || 5.0}</span>
               <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
             </div>
-            <span className="text-[10px] text-zinc-500 block mt-1">Motorista Elite</span>
+            <span className="text-[10px] text-zinc-500 block mt-1">Motorista Credenciado</span>
           </div>
 
         </div>

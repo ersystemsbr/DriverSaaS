@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Car, User, Settings, Wallet, LogOut, LogIn, KeyRound } from 'lucide-react';
+import { Shield, Car, User, Settings, Wallet, LogOut, LogIn, KeyRound, Database } from 'lucide-react';
 
 export default function Navbar({ 
   currentRole, 
@@ -8,7 +8,8 @@ export default function Navbar({
   setActivePage, 
   driver, 
   currentUser, 
-  onLogout 
+  onLogout,
+  onOpenSupabaseConfig
 }) {
   const [isSecretOpen, setIsSecretOpen] = useState(false);
   const [adminPin, setAdminPin] = useState('');
@@ -59,6 +60,18 @@ export default function Navbar({
 
         {/* Right Action Items */}
         <div className="flex items-center gap-3">
+          
+          {/* Supabase Status / Config Button */}
+          {onOpenSupabaseConfig && (
+            <button
+              onClick={onOpenSupabaseConfig}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 text-[11px] text-zinc-300 transition-colors"
+              title="Status do Banco Supabase"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="hidden sm:inline font-mono text-[10px] text-emerald-400 font-bold">Supabase</span>
+            </button>
+          )}
           
           {/* Se logado como motorista: mostra o saldo */}
           {currentUser && currentRole === 'driver' && (

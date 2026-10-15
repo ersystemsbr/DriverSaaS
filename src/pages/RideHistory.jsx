@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { History, Scale, MapPin, Calendar, Clock, DollarSign, Filter, CheckCircle2, XCircle } from 'lucide-react';
 import RideContractModal from '../components/RideContractModal';
 
-export default function RideHistory({ ridesHistory, driver }) {
+export default function RideHistory({ ridesHistory = [], driver }) {
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'completed', 'cancelled'
   const [selectedRideForContract, setSelectedRideForContract] = useState(null);
 
-  const filteredRides = ridesHistory.filter(ride => {
+  const safeList = ridesHistory || [];
+
+  const filteredRides = safeList.filter(ride => {
     if (filterStatus === 'completed') return ride.status === 'completed';
     if (filterStatus === 'cancelled') return ride.status === 'cancelled';
     return true;
   });
 
-  const totalEarnings = ridesHistory
+  const totalEarnings = safeList
     .filter(r => r.status === 'completed')
     .reduce((acc, curr) => acc + (parseFloat(curr.total_price) || 0), 0);
 
@@ -46,7 +48,7 @@ export default function RideHistory({ ridesHistory, driver }) {
             filterStatus === 'all' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-400 hover:text-white'
           }`}
         >
-          Todas ({ridesHistory.length})
+          Todas ({safeList.length})
         </button>
         <button
           onClick={() => setFilterStatus('completed')}
@@ -54,7 +56,7 @@ export default function RideHistory({ ridesHistory, driver }) {
             filterStatus === 'completed' ? 'bg-green-500/20 text-green-400 font-bold shadow-md' : 'text-zinc-400 hover:text-white'
           }`}
         >
-          Concluídas ({ridesHistory.filter(r => r.status === 'completed').length})
+          Concluídas ({safeList.filter(r => r.status === 'completed').length})
         </button>
         <button
           onClick={() => setFilterStatus('cancelled')}
@@ -62,7 +64,7 @@ export default function RideHistory({ ridesHistory, driver }) {
             filterStatus === 'cancelled' ? 'bg-red-500/20 text-red-400 font-bold shadow-md' : 'text-zinc-400 hover:text-white'
           }`}
         >
-          Canceladas ({ridesHistory.filter(r => r.status === 'cancelled').length})
+          Canceladas ({safeList.filter(r => r.status === 'cancelled').length})
         </button>
       </div>
 
@@ -107,11 +109,11 @@ export default function RideHistory({ ridesHistory, driver }) {
                 <div className="space-y-1.5 text-xs text-zinc-300 bg-zinc-900/50 p-3 rounded-2xl border border-zinc-800/60">
                   <div className="flex items-start gap-2">
                     <MapPin className="w-3.5 h-3.5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span className="truncate">{ride.origin}</span>
+                    <span className="truncate">{ride.origin || ride.origin_address || 'Ponto de Origem'}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <MapPin className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <span className="truncate">{ride.destination}</span>
+                    <span className="truncate">{ride.destination || ride.destination_address || 'Destino'}</span>
                   </div>
                 </div>
 
@@ -120,7 +122,7 @@ export default function RideHistory({ ridesHistory, driver }) {
                   <div className="flex items-center gap-3 text-[11px]">
                     <span>Passageiro: <strong className="text-white">{ride.passenger_name}</strong></span>
                     <span>•</span>
-                    <span>{new Date(ride.date).toLocaleDateString('pt-BR')}</span>
+                    <span>{new Date(ride.date || ride.created_at || Date.now()).toLocaleDateString('pt-BR')}</span>
                   </div>
 
                   <button

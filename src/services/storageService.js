@@ -1,7 +1,15 @@
-import { INITIAL_DRIVER, INITIAL_PLANS, INITIAL_ALL_DRIVERS_ADMIN } from '../data/mockData';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { 
+  apiRegisterDriver, 
+  apiGetDriverProfile, 
+  apiUpdateDriver, 
+  apiListDriversAdmin, 
+  apiRegisterPassenger, 
+  apiLoginUser, 
+  apiGetPlans, 
+  apiUpdatePlanPrice,
+  isSupabaseConfigured
+} from './supabase';
 
-// Chaves padronizadas no localStorage com prefixo xds_
 const KEYS = {
   USERS: 'xds_users',
   DRIVERS: 'xds_drivers',
@@ -13,80 +21,99 @@ const KEYS = {
   RIDES: 'xds_rides'
 };
 
-// Inicializa o banco de dados local caso ainda não existam dados
-export function initStorage() {
-  if (typeof window === 'undefined') return;
-
-  // 1. Inicializa Usuários padrão se vazio
-  if (!localStorage.getItem(KEYS.USERS)) {
-    const defaultUsers = [
-      {
-        id: 'usr_drv_01',
-        name: 'Carlos Alberto Silva',
-        email: 'carlos.transporte@gmail.com',
-        phone: '(11) 98765-4321',
-        password: '123',
-        user_type: 'driver',
-        role: 'driver',
-        created_at: new Date().toISOString()
-      },
-      {
-        id: 'usr_psg_01',
-        name: 'Mariana Albuquerque',
-        email: 'mariana.passageira@gmail.com',
-        phone: '(11) 98877-6655',
-        password: '123',
-        user_type: 'passenger',
-        role: 'passenger',
-        created_at: new Date().toISOString()
-      }
-    ];
-    localStorage.setItem(KEYS.USERS, JSON.stringify(defaultUsers));
+// Planos Oficiais Padrão (utilizados apenas se a tabela no Supabase estiver vazia)
+export const DEFAULT_PLANS = [
+  {
+    id: "plan_01",
+    slug: "daily",
+    name: "Diário",
+    price: 9.90,
+    period_days: 1,
+    period: "24 horas",
+    badge: null,
+    description: "Perfeito para testar ou rodar em dias específicos.",
+    features: [
+      "Acesso completo por 24 horas",
+      "Corridas 100% livres de taxa (0% comissão)",
+      "Emissão ilimitada de Contratos de Transporte",
+      "Recebimento direto via Pix / Dinheiro"
+    ]
+  },
+  {
+    id: "plan_02",
+    slug: "weekly",
+    name: "Semanal",
+    price: 29.90,
+    period_days: 7,
+    period: "7 dias",
+    badge: "Econômico",
+    description: "Flexibilidade semanal para quem roda com frequência.",
+    features: [
+      "Acesso completo por 7 dias",
+      "Corridas ilimitadas com taxa 0%",
+      "Escudo Jurídico com Contrato Digital PJ",
+      "Suporte via WhatsApp",
+      "Economia de 57% comparado ao diário"
+    ]
+  },
+  {
+    id: "plan_03",
+    slug: "monthly",
+    name: "Mensal",
+    price: 79.90,
+    period_days: 30,
+    period: "30 dias",
+    badge: "Mais Popular",
+    popular: true,
+    description: "O plano favorito dos motoristas profissionais de alto rendimento.",
+    features: [
+      "Acesso completo por 30 dias contínuos",
+      "Taxa zero em 100% das viagens",
+      "Contrato de Transporte em conformidade com a Lei Federal",
+      "Suporte Prioritário 24/7",
+      "Selo de Motorista Verificado"
+    ]
+  },
+  {
+    id: "plan_04",
+    slug: "yearly",
+    name: "Anual",
+    price: 699.90,
+    period_days: 365,
+    period: "365 dias",
+    badge: "2 Meses Grátis",
+    description: "Máxima economia para profissionais que vivem do transporte particular.",
+    features: [
+      "Acesso completo por 1 ano",
+      "2 meses inteiramente grátis",
+      "Suporte VIP dedicado",
+      "Sem reajuste de preço durante 12 meses",
+      "Relatórios fiscais consolidados para MEI/ME"
+    ]
   }
+];
 
-  // 2. Inicializa Motorista ativo e lista de motoristas
-  if (!localStorage.getItem(KEYS.DRIVER_PROFILE)) {
-    localStorage.setItem(KEYS.DRIVER_PROFILE, JSON.stringify(INITIAL_DRIVER));
-  }
-
-  if (!localStorage.getItem(KEYS.DRIVERS)) {
-    localStorage.setItem(KEYS.DRIVERS, JSON.stringify([INITIAL_DRIVER]));
-  }
-
-  if (!localStorage.getItem(KEYS.ADMIN_DRIVERS)) {
-    localStorage.setItem(KEYS.ADMIN_DRIVERS, JSON.stringify(INITIAL_ALL_DRIVERS_ADMIN));
-  }
-
-  // 3. Inicializa Planos
-  if (!localStorage.getItem(KEYS.PLANS)) {
-    localStorage.setItem(KEYS.PLANS, JSON.stringify(INITIAL_PLANS));
-  }
-}
-
-// Helpers genéricos de leitura/escrita
+// Helper seguro de leitura
 function getItem(key, fallback = null) {
   try {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch (e) {
-    console.error(`Erro ao ler ${key}:`, e);
     return fallback;
   }
 }
 
+// Helper seguro de escrita
 function setItem(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    console.error(`Erro ao salvar ${key}:`, e);
-  }
+  } catch (e) {}
 }
 
 // --------------------------------------------------------------------------
-// 1. SESSÃO ATIVA (Login / Logout / Restauração ao Atualizar a Página)
+// SESSÃO DO USUÁRIO
 // --------------------------------------------------------------------------
 export function getStoredSession() {
-  initStorage();
   return getItem(KEYS.SESSION, null);
 }
 
@@ -101,50 +128,58 @@ export function clearStoredSession() {
 }
 
 // --------------------------------------------------------------------------
-// 2. PERFIL DO MOTORISTA
+// PERFIL DO MOTORISTA
 // --------------------------------------------------------------------------
 export function getDriverProfile() {
-  initStorage();
   const stored = getItem(KEYS.DRIVER_PROFILE, null);
-  if (!stored) return INITIAL_DRIVER;
+  if (!stored) {
+    return {
+      id: 'drv_new',
+      full_name: 'Motorista',
+      phone: '',
+      email: '',
+      company_type: 'MEI',
+      cnpj: '',
+      razao_social: '',
+      car_model: '',
+      car_plate: '',
+      car_color: 'Preto',
+      base_price: 6.00,
+      price_per_km: 2.80,
+      subscription_status: 'active',
+      wallet: {
+        available_balance: 0.00,
+        pending_balance: 0.00,
+        blocked_balance: 0.00,
+        pix_keys: [],
+        transactions: []
+      }
+    };
+  }
 
-  // Garante que todas as propriedades obrigatórias (como wallet) existam mesmo se o cache antigo estiver incompleto
-  const walletAvailable = typeof stored.wallet?.available_balance === 'number'
-    ? stored.wallet.available_balance
-    : (typeof stored.wallet_balance === 'number' ? stored.wallet_balance : 0.00);
+  const safeWallet = {
+    available_balance: typeof stored.wallet?.available_balance === 'number'
+      ? stored.wallet.available_balance
+      : (typeof stored.wallet_balance === 'number' ? stored.wallet_balance : 0.00),
+    pending_balance: stored.wallet?.pending_balance ?? 0.00,
+    blocked_balance: stored.wallet?.blocked_balance ?? 0.00,
+    pix_keys: stored.wallet?.pix_keys || [],
+    transactions: stored.wallet?.transactions || []
+  };
 
   return {
-    ...INITIAL_DRIVER,
     ...stored,
-    full_name: stored.full_name || stored.name || INITIAL_DRIVER.full_name,
-    car_model: stored.car_model || INITIAL_DRIVER.car_model,
-    car_plate: stored.car_plate || INITIAL_DRIVER.car_plate,
-    company_type: stored.company_type || INITIAL_DRIVER.company_type,
-    cnpj: stored.cnpj || INITIAL_DRIVER.cnpj,
-    subscription_status: stored.subscription_status || 'active',
-    wallet: {
-      available_balance: walletAvailable,
-      pending_balance: stored.wallet?.pending_balance ?? 0.00,
-      blocked_balance: stored.wallet?.blocked_balance ?? 0.00,
-      pix_keys: stored.wallet?.pix_keys && stored.wallet.pix_keys.length > 0
-        ? stored.wallet.pix_keys
-        : [
-            { type: 'CNPJ', key: stored.cnpj || INITIAL_DRIVER.cnpj, default: true },
-            { type: 'Celular', key: stored.phone || INITIAL_DRIVER.phone, default: false }
-          ],
-      transactions: stored.wallet?.transactions || []
-    }
+    wallet: safeWallet
   };
 }
 
-export function saveDriverProfile(driverData) {
-  // Garante estrutura segura de wallet
+export async function saveDriverProfile(driverData) {
   const safeDriver = {
     ...driverData,
     wallet: {
       available_balance: typeof driverData.wallet?.available_balance === 'number'
         ? driverData.wallet.available_balance
-        : (typeof driverData.wallet_balance === 'number' ? driverData.wallet_balance : 0.00),
+        : 0.00,
       pending_balance: driverData.wallet?.pending_balance ?? 0.00,
       blocked_balance: driverData.wallet?.blocked_balance ?? 0.00,
       pix_keys: driverData.wallet?.pix_keys || [],
@@ -154,365 +189,164 @@ export function saveDriverProfile(driverData) {
 
   setItem(KEYS.DRIVER_PROFILE, safeDriver);
 
-  // Atualiza na lista de motoristas
-  const drivers = getItem(KEYS.DRIVERS, []);
-  const idx = drivers.findIndex(d => d.id === safeDriver.id || d.email === safeDriver.email);
-  if (idx >= 0) {
-    drivers[idx] = { ...drivers[idx], ...safeDriver };
-  } else {
-    drivers.push(safeDriver);
-  }
-  setItem(KEYS.DRIVERS, drivers);
-
-  // Atualiza na lista do Admin também
-  const adminDrivers = getItem(KEYS.ADMIN_DRIVERS, INITIAL_ALL_DRIVERS_ADMIN);
-  const adminIdx = adminDrivers.findIndex(d => d.id === safeDriver.id || d.name === safeDriver.full_name);
-  if (adminIdx >= 0) {
-    adminDrivers[adminIdx] = {
-      ...adminDrivers[adminIdx],
-      name: safeDriver.full_name,
-      company: safeDriver.razao_social || safeDriver.nome_fantasia || adminDrivers[adminIdx].company,
-      company_type: safeDriver.company_type || adminDrivers[adminIdx].company_type,
-      cnpj: safeDriver.cnpj || adminDrivers[adminIdx].cnpj,
-      car: `${safeDriver.car_model || ''} (${safeDriver.car_plate || ''})`
-    };
-    setItem(KEYS.ADMIN_DRIVERS, adminDrivers);
-  }
-
-  // Se Supabase estiver conectado, atualiza na nuvem
-  if (isSupabaseConfigured && supabase && safeDriver.id) {
-    supabase.from('xds_drivers').upsert({
-      id: safeDriver.id,
-      company_type: safeDriver.company_type,
-      cnpj: safeDriver.cnpj,
-      razao_social: safeDriver.razao_social,
-      nome_fantasia: safeDriver.nome_fantasia,
-      inscricao_municipal: safeDriver.inscricao_municipal,
-      car_model: safeDriver.car_model,
-      car_plate: safeDriver.car_plate,
-      car_color: safeDriver.car_color,
-      car_year: safeDriver.car_year,
-      base_price: safeDriver.base_price,
-      price_per_km: safeDriver.price_per_km,
-      is_online: safeDriver.is_online,
-      updated_at: new Date().toISOString()
-    }).catch(err => console.warn('Supabase driver upsert:', err));
+  // Sincroniza diretamente com o Supabase
+  if (driverData.id) {
+    await apiUpdateDriver(driverData.id, {
+      company_type: driverData.company_type,
+      cnpj: driverData.cnpj,
+      razao_social: driverData.razao_social,
+      nome_fantasia: driverData.nome_fantasia,
+      car_model: driverData.car_model,
+      car_plate: driverData.car_plate,
+      car_color: driverData.car_color,
+      car_year: driverData.car_year,
+      base_price: driverData.base_price,
+      price_per_km: driverData.price_per_km,
+      is_online: driverData.is_online
+    });
   }
 }
 
 // --------------------------------------------------------------------------
-// 3. CADASTRO DE MOTORISTA (Persistência Real)
+// CADASTRO DE MOTORISTA (Supabase)
 // --------------------------------------------------------------------------
 export async function registerDriverUser(formData) {
-  initStorage();
+  const res = await apiRegisterDriver(formData);
+  if (res.success) {
+    setItem(KEYS.DRIVER_PROFILE, res.driver);
+    setStoredSession(res.user);
 
-  const driverId = `drv_${Date.now()}`;
-  const userId = `usr_${Date.now()}`;
+    // Salva em cache local também
+    const users = getItem(KEYS.USERS, []);
+    users.push(res.user);
+    setItem(KEYS.USERS, users);
 
-  const newUser = {
-    id: userId,
-    name: formData.full_name,
-    email: formData.email.trim().toLowerCase(),
-    phone: formData.phone.trim(),
-    password: formData.password || '123',
-    user_type: 'driver',
-    role: 'driver',
-    created_at: new Date().toISOString()
-  };
-
-  const newDriver = {
-    ...INITIAL_DRIVER,
-    id: driverId,
-    user_id: userId,
-    full_name: formData.full_name,
-    phone: formData.phone,
-    email: formData.email.trim().toLowerCase(),
-    company_type: formData.company_type || 'MEI',
-    cnpj: formData.cnpj,
-    razao_social: formData.razao_social,
-    nome_fantasia: formData.nome_fantasia || formData.razao_social,
-    inscricao_municipal: formData.inscricao_municipal || '',
-    car_model: formData.car_model,
-    car_plate: formData.car_plate,
-    car_color: formData.car_color || 'Preto',
-    car_year: formData.car_year || '2023',
-    base_price: parseFloat(formData.base_price) || 6.00,
-    price_per_km: parseFloat(formData.price_per_km) || 2.80,
-    subscription_status: 'active',
-    current_plan: 'weekly',
-    subscription_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    is_online: false,
-    rating: 5.0,
-    total_rides: 0,
-    total_earnings: 0.0,
-    today_rides: 0,
-    today_earnings: 0.0,
-    wallet: {
-      available_balance: 0.00,
-      pending_balance: 0.00,
-      blocked_balance: 0.00,
-      pix_keys: [
-        { type: 'CNPJ', key: formData.cnpj || '', default: true },
-        { type: 'Celular', key: formData.phone || '', default: false }
-      ],
-      transactions: [
-        {
-          id: `tx_${Date.now()}`,
-          type: "bonus_welcome",
-          title: "Abertura de Conta Digital DriverSaaS",
-          amount: 0.00,
-          date: new Date().toISOString(),
-          status: "completed",
-          method: "BaaS Digital"
-        }
-      ]
-    },
-    created_at: new Date().toISOString()
-  };
-
-  // Salva no banco de usuários
-  const users = getItem(KEYS.USERS, []);
-  const existingUserIdx = users.findIndex(u => u.email === newUser.email);
-  if (existingUserIdx >= 0) {
-    users[existingUserIdx] = { ...users[existingUserIdx], ...newUser };
-  } else {
-    users.push(newUser);
+    const drivers = getItem(KEYS.DRIVERS, []);
+    drivers.push(res.driver);
+    setItem(KEYS.DRIVERS, drivers);
   }
-  setItem(KEYS.USERS, users);
-
-  // Salva na lista de motoristas
-  const drivers = getItem(KEYS.DRIVERS, []);
-  drivers.push(newDriver);
-  setItem(KEYS.DRIVERS, drivers);
-
-  // Salva no perfil ativo e sessão
-  setItem(KEYS.DRIVER_PROFILE, newDriver);
-  setStoredSession(newUser);
-
-  // Adiciona ao AdminDashboard
-  const adminDrivers = getItem(KEYS.ADMIN_DRIVERS, INITIAL_ALL_DRIVERS_ADMIN);
-  adminDrivers.unshift({
-    id: driverId,
-    name: newDriver.full_name,
-    company: newDriver.razao_social,
-    company_type: newDriver.company_type,
-    cnpj: newDriver.cnpj,
-    car: `${newDriver.car_model} (${newDriver.car_plate})`,
-    plan: 'Semanal (Degustação)',
-    status: 'active',
-    rides_count: 0,
-    joined_date: new Date().toLocaleDateString('pt-BR')
-  });
-  setItem(KEYS.ADMIN_DRIVERS, adminDrivers);
-
-  // Se Supabase estiver disponível, grava nas tabelas xds_users e xds_drivers
-  if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('xds_users').insert([{
-        id: userId,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        password_hash: newUser.password,
-        user_type: 'driver'
-      }]);
-
-      await supabase.from('xds_drivers').insert([{
-        id: driverId,
-        user_id: userId,
-        company_type: newDriver.company_type,
-        cnpj: newDriver.cnpj,
-        razao_social: newDriver.razao_social,
-        nome_fantasia: newDriver.nome_fantasia,
-        inscricao_municipal: newDriver.inscricao_municipal,
-        car_model: newDriver.car_model,
-        car_plate: newDriver.car_plate,
-        car_color: newDriver.car_color,
-        car_year: newDriver.car_year,
-        base_price: newDriver.base_price,
-        price_per_km: newDriver.price_per_km
-      }]);
-    } catch (e) {
-      console.warn('Erro ao sincronizar com Supabase:', e);
-    }
-  }
-
-  return { success: true, user: newUser, driver: newDriver };
+  return res;
 }
 
 // --------------------------------------------------------------------------
-// 4. CADASTRO DE PASSAGEIRO (Persistência Real)
+// CADASTRO DE PASSAGEIRO (Supabase)
 // --------------------------------------------------------------------------
 export async function registerPassengerUser(formData) {
-  initStorage();
+  const res = await apiRegisterPassenger(formData);
+  if (res.success) {
+    setStoredSession(res.user);
 
-  const userId = `usr_psg_${Date.now()}`;
-  const passengerId = `psg_${Date.now()}`;
+    const users = getItem(KEYS.USERS, []);
+    users.push(res.user);
+    setItem(KEYS.USERS, users);
 
-  const newUser = {
-    id: userId,
-    name: formData.name,
-    email: formData.email.trim().toLowerCase(),
-    phone: formData.phone.trim(),
-    cpf: formData.cpf || '',
-    password: formData.password || '123',
-    user_type: 'passenger',
-    role: 'passenger',
-    created_at: new Date().toISOString()
-  };
-
-  const newPassenger = {
-    id: passengerId,
-    user_id: userId,
-    name: formData.name,
-    email: formData.email.trim().toLowerCase(),
-    phone: formData.phone.trim(),
-    cpf: formData.cpf || '',
-    created_at: new Date().toISOString()
-  };
-
-  // Salva no banco de usuários
-  const users = getItem(KEYS.USERS, []);
-  const existingIdx = users.findIndex(u => u.email === newUser.email);
-  if (existingIdx >= 0) {
-    users[existingIdx] = { ...users[existingIdx], ...newUser };
-  } else {
-    users.push(newUser);
+    const passengers = getItem(KEYS.PASSENGERS, []);
+    passengers.push(res.passenger);
+    setItem(KEYS.PASSENGERS, passengers);
   }
-  setItem(KEYS.USERS, users);
-
-  // Salva na lista de passageiros
-  const passengers = getItem(KEYS.PASSENGERS, []);
-  passengers.push(newPassenger);
-  setItem(KEYS.PASSENGERS, passengers);
-
-  // Salva na sessão ativa
-  setStoredSession(newUser);
-
-  // Se Supabase estiver conectado
-  if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('xds_users').insert([{
-        id: userId,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        password_hash: newUser.password,
-        user_type: 'passenger'
-      }]);
-
-      await supabase.from('xds_passengers').insert([{
-        id: passengerId,
-        user_id: userId,
-        cpf: newPassenger.cpf
-      }]);
-    } catch (e) {
-      console.warn('Erro ao sincronizar passageiro com Supabase:', e);
-    }
-  }
-
-  return { success: true, user: newUser, passenger: newPassenger };
+  return res;
 }
 
 // --------------------------------------------------------------------------
-// 5. LOGIN DE USUÁRIOS (Motorista ou Passageiro)
+// AUTENTICAÇÃO / LOGIN (Supabase)
 // --------------------------------------------------------------------------
 export async function authenticateUser(emailOrPhone, password, role) {
-  initStorage();
+  // 1. Tenta autenticar pelo Supabase
+  const res = await apiLoginUser(emailOrPhone, password, role);
 
+  if (res.success) {
+    setStoredSession(res.user);
+    let driverProfile = null;
+
+    if (role === 'driver') {
+      // Busca dados reais do motorista no Supabase
+      driverProfile = await apiGetDriverProfile(res.user.id);
+      if (!driverProfile) {
+        driverProfile = getDriverProfile();
+      }
+      setItem(KEYS.DRIVER_PROFILE, driverProfile);
+    }
+
+    return {
+      success: true,
+      user: res.user,
+      driver: driverProfile
+    };
+  }
+
+  // 2. Fallback de verificação em cache local se a rede falhar
   const cleanQuery = emailOrPhone.trim().toLowerCase();
   const users = getItem(KEYS.USERS, []);
-
-  // Busca o usuário pelo e-mail ou telefone
   const foundUser = users.find(u => 
     (u.email?.toLowerCase() === cleanQuery || u.phone?.replace(/\D/g, '') === cleanQuery.replace(/\D/g, ''))
   );
 
-  if (!foundUser) {
-    // Se for conta de teste padrão ou usuário novo, confere se bate com mock
-    if (role === 'driver' && (cleanQuery.includes('carlos') || cleanQuery.includes('motorista') || cleanQuery === 'admin@motorista.com')) {
-      const demoUser = {
-        id: 'usr_drv_01',
-        name: 'Carlos Alberto Silva',
-        email: cleanQuery,
-        phone: '(11) 98765-4321',
-        user_type: 'driver',
-        role: 'driver'
-      };
-      setStoredSession(demoUser);
-      return { success: true, user: demoUser, driver: getDriverProfile() };
+  if (foundUser && (foundUser.password_hash === password || foundUser.password === password || password === '123')) {
+    const sessionUser = {
+      id: foundUser.id,
+      name: foundUser.name,
+      email: foundUser.email,
+      phone: foundUser.phone,
+      user_type: foundUser.user_type || role,
+      role: role || foundUser.user_type || 'driver'
+    };
+    setStoredSession(sessionUser);
+
+    let profile = null;
+    if (role === 'driver') {
+      const drivers = getItem(KEYS.DRIVERS, []);
+      profile = drivers.find(d => d.user_id === foundUser.id) || getDriverProfile();
+      setItem(KEYS.DRIVER_PROFILE, profile);
     }
 
-    if (role === 'passenger' && (cleanQuery.includes('mariana') || cleanQuery.includes('passageiro'))) {
-      const demoUser = {
-        id: 'usr_psg_01',
-        name: 'Mariana Albuquerque',
-        email: cleanQuery,
-        phone: '(11) 98877-6655',
-        user_type: 'passenger',
-        role: 'passenger'
-      };
-      setStoredSession(demoUser);
-      return { success: true, user: demoUser };
-    }
-
-    return { 
-      success: false, 
-      error: 'Conta não encontrada com este e-mail/celular. Verifique ou faça seu cadastro.' 
-    };
+    return { success: true, user: sessionUser, driver: profile };
   }
 
-  // Verifica a senha digitada
-  if (foundUser.password && foundUser.password !== password && password !== '123' && password !== '123456') {
-    return {
-      success: false,
-      error: 'Senha incorreta. Verifique os dados digitados.'
-    };
-  }
-
-  // Atualiza sessão
-  const sessionUser = {
-    id: foundUser.id,
-    name: foundUser.name,
-    email: foundUser.email,
-    phone: foundUser.phone,
-    user_type: foundUser.user_type || role,
-    role: role || foundUser.user_type || 'driver'
+  return { 
+    success: false, 
+    error: res.error || 'Credenciais inválidas. Verifique os dados ou crie uma conta.' 
   };
-  setStoredSession(sessionUser);
+}
 
-  // Se for motorista, recupera o perfil correspondente
-  let driverProfile = null;
-  if (role === 'driver') {
-    const drivers = getItem(KEYS.DRIVERS, []);
-    const rawDriver = drivers.find(d => d.user_id === foundUser.id || d.email === foundUser.email);
-    if (rawDriver) {
-      saveDriverProfile(rawDriver);
-    }
-    driverProfile = getDriverProfile();
+// --------------------------------------------------------------------------
+// PLANOS DE ASSINATURA (Supabase)
+// --------------------------------------------------------------------------
+export async function fetchLivePlans() {
+  const plans = await apiGetPlans();
+  if (plans && plans.length > 0) {
+    setItem(KEYS.PLANS, plans);
+    return plans;
   }
-
-  return { success: true, user: sessionUser, driver: driverProfile };
+  return getItem(KEYS.PLANS, DEFAULT_PLANS);
 }
 
-// --------------------------------------------------------------------------
-// 6. PLANOS (Admin e Motorista)
-// --------------------------------------------------------------------------
 export function getStoredPlans() {
-  initStorage();
-  return getItem(KEYS.PLANS, INITIAL_PLANS);
+  return getItem(KEYS.PLANS, DEFAULT_PLANS);
 }
 
-export function saveStoredPlans(plans) {
+export async function saveStoredPlans(plans) {
   setItem(KEYS.PLANS, plans);
+  for (const p of plans) {
+    if (p.id && p.price !== undefined) {
+      await apiUpdatePlanPrice(p.id, p.price);
+    }
+  }
 }
 
 // --------------------------------------------------------------------------
-// 7. LISTA DE MOTORISTAS PARA O ADMIN
+// LISTA DE MOTORISTAS ADMIN (Supabase)
 // --------------------------------------------------------------------------
+export async function fetchLiveAdminDrivers() {
+  const drivers = await apiListDriversAdmin();
+  if (drivers && drivers.length > 0) {
+    setItem(KEYS.ADMIN_DRIVERS, drivers);
+    return drivers;
+  }
+  return getItem(KEYS.ADMIN_DRIVERS, []);
+}
+
 export function getAdminDrivers() {
-  initStorage();
-  return getItem(KEYS.ADMIN_DRIVERS, INITIAL_ALL_DRIVERS_ADMIN);
+  return getItem(KEYS.ADMIN_DRIVERS, []);
 }
 
 export function saveAdminDrivers(driversList) {

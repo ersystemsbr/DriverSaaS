@@ -14,12 +14,13 @@ import {
   Navigation,
   Loader2
 } from 'lucide-react';
-import { INITIAL_FAVORITE_DRIVERS } from '../data/mockData';
 import RealMap from '../components/RealMap';
 import { getDeviceLocation, searchAddressNominatim, calculateRealRoute } from '../services/mapService';
-import { createRideRequest } from '../services/supabase';
+import { createRideRequest, apiGetFavoriteDrivers } from '../services/supabase';
 
 export default function PassengerHome({ driver, setActivePage, setCurrentRide, currentUser }) {
+  const [favoriteDrivers, setFavoriteDrivers] = useState([]);
+  
   // GPS e Coordenadas
   const [deviceCoords, setDeviceCoords] = useState({ lat: -23.561684, lng: -46.655981 });
   const [origin, setOrigin] = useState('Av. Paulista, 1578 - Bela Vista, São Paulo');
@@ -51,6 +52,15 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
       setOriginCoords(coords);
     });
   }, []);
+
+  // 1.1 Carregar motoristas reais do Supabase
+  useEffect(() => {
+    apiGetFavoriteDrivers(currentUser?.id).then(drivers => {
+      if (drivers && drivers.length > 0) {
+        setFavoriteDrivers(drivers);
+      }
+    });
+  }, [currentUser?.id]);
 
   // 2. Traçar rota real entre Origem e Destino sempre que as coordenadas mudarem
   useEffect(() => {
@@ -114,7 +124,7 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
   // Cálculo de Preço (Base + Preço/Km da Tabela do Motorista)
   const distanceKm = routeData?.distanceKm || 8.5;
   const durationMin = routeData?.durationMin || 22;
-  const estimatedPrice = (driver.base_price || 6.00) + (distanceKm * (driver.price_per_km || 2.80));
+  const estimatedPrice = (driver?.base_price || 6.00) + (distanceKm * (driver?.price_per_km || 2.80));
 
   // Solicitar Corrida (Despacho Realtime e Cascata)
   const handleStartDispatch = async () => {
@@ -329,39 +339,46 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
         </div>
 
         <div className="space-y-2.5">
-          {INITIAL_FAVORITE_DRIVERS.map((fav) => (
-            <div
-              key={fav.id}
-              className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex items-center justify-between gap-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center ${
-                  fav.priority === 1 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800 text-zinc-400'
-                }`}>
-                  #{fav.priority}
+          {favoriteDrivers.length > 0 ? (
+            favoriteDrivers.map((fav) => (
+              <div
+                key={fav.id}
+                className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center ${
+                    fav.priority === 1 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800 text-zinc-400'
+                  }`}>
+                    #{fav.priority}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                      {fav.name}
+                      {fav.priority === 1 && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-green-500/20 text-green-400 font-bold">
+                          Preferencial
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-[11px] text-zinc-400">{fav.car} • {fav.company || 'PJ Credenciado'}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                    {fav.name}
-                    {fav.priority === 1 && (
-                      <span className="px-1.5 py-0.2 rounded text-[9px] bg-green-500/20 text-green-400 font-bold">
-                        Preferencial
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-[11px] text-zinc-400">{fav.car} • {fav.rides_with_passenger} viagens realizadas</p>
-                </div>
-              </div>
 
-              <div className="text-right flex-shrink-0">
-                <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
-                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  {fav.rating}
-                </span>
-                <span className="text-[10px] text-green-400 block font-medium">~{fav.eta_min} min</span>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1">
+                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                    {fav.rating || '5.0'}
+                  </span>
+                  <span className="text-[10px] text-green-400 block font-medium">~{fav.eta_min || 5} min</span>
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60 text-center text-xs text-zinc-400">
+              <Car className="w-6 h-6 text-zinc-600 mx-auto mb-2" />
+              <span>Nenhum motorista favorito cadastrado ainda. A chamada será enviada para motoristas ativos da região.</span>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Botão de Solicitação ou Painel de Chamada Ativa */}

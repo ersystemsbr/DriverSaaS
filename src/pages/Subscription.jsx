@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Crown, CheckCircle2, ShieldCheck, Sparkles, AlertCircle, Calendar, ArrowRight, Zap } from 'lucide-react';
 import PixModal from '../components/PixModal';
+import { apiCreateSubscription } from '../services/supabase';
 
 export default function Subscription({ driver, setDriver, plans, setActivePage }) {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [isPixModalOpen, setIsPixModalOpen] = useState(false);
 
-  const isSubActive = driver.subscription_status === 'active';
-  const expiresDate = new Date(driver.subscription_expires_at);
+  const isSubActive = driver?.subscription_status === 'active';
+  const expiresDate = new Date(driver?.subscription_expires_at || Date.now());
   const daysRemaining = Math.max(0, Math.ceil((expiresDate - new Date()) / (1000 * 60 * 60 * 24)));
 
   const handleSelectPlan = (plan) => {
@@ -15,22 +16,36 @@ export default function Subscription({ driver, setDriver, plans, setActivePage }
     setIsPixModalOpen(true);
   };
 
-  const handleConfirmSubscription = () => {
+  const handleConfirmSubscription = async () => {
     if (!selectedPlan) return;
 
     let durationDays = 1;
-    if (selectedPlan.id === 'weekly') durationDays = 7;
-    if (selectedPlan.id === 'monthly') durationDays = 30;
-    if (selectedPlan.id === 'yearly') durationDays = 365;
+    if (selectedPlan.id === 'weekly' || selectedPlan.slug === 'weekly') durationDays = 7;
+    if (selectedPlan.id === 'monthly' || selectedPlan.slug === 'monthly') durationDays = 30;
+    if (selectedPlan.id === 'yearly' || selectedPlan.slug === 'yearly') durationDays = 365;
 
     const newExpiration = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+
+    if (driver?.id) {
+      try {
+        await apiCreateSubscription(
+          driver.id,
+          selectedPlan.plan_db_id || selectedPlan.id,
+          selectedPlan.price,
+          durationDays,
+          'Pix Direto'
+        );
+      } catch (err) {
+        console.warn('Erro ao salvar assinatura no Supabase:', err);
+      }
+    }
 
     setDriver(prev => {
       const prevWallet = prev?.wallet || { available_balance: 0, pending_balance: 0, pix_keys: [], transactions: [] };
       return {
         ...prev,
         subscription_status: 'active',
-        current_plan: selectedPlan.id,
+        current_plan: selectedPlan.slug || selectedPlan.id,
         subscription_expires_at: newExpiration,
         wallet: {
           ...prevWallet,
@@ -86,7 +101,7 @@ export default function Subscription({ driver, setDriver, plans, setActivePage }
                   <span className="text-xs text-zinc-400">• Escudo Jurídico Regular</span>
                 </div>
                 <h3 className="text-lg font-bold text-white mt-0.5">
-                  Plano {driver.current_plan === 'daily' ? 'Diário' : driver.current_plan === 'weekly' ? 'Semanal' : driver.current_plan === 'yearly' ? 'Anual' : 'Mensal'}
+                  Plano {driver?.current_plan === 'daily' ? 'Diário' : driver?.current_plan === 'weekly' ? 'Semanal' : driver?.current_plan === 'yearly' ? 'Anual' : 'Mensal'}
                 </h3>
               </div>
             </div>
@@ -116,7 +131,7 @@ export default function Subscription({ driver, setDriver, plans, setActivePage }
       {/* Plans Pricing Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {plans.map((plan) => {
-          const isSelected = isSubActive && driver.current_plan === plan.id;
+          const isSelected = isSubActive && (driver?.current_plan === plan.id || driver?.current_plan === plan.slug);
           return (
             <div
               key={plan.id}

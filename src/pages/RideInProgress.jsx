@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import RideContractModal from '../components/RideContractModal';
 import RealMap from '../components/RealMap';
+import { updateRideStatus, apiCreateContract, apiDepositPix } from '../services/supabase';
 
 export default function RideInProgress({ currentRide, driver, setDriver, setRidesHistory, setActivePage }) {
   const [rideStage, setRideStage] = useState('on_the_way'); // 'on_the_way', 'in_trip', 'completed'
@@ -56,7 +57,7 @@ export default function RideInProgress({ currentRide, driver, setDriver, setRide
     window.open(`https://api.whatsapp.com/send?phone=55${ride.passenger_phone.replace(/\D/g, '')}&text=${text}`, '_blank');
   };
 
-  const handleCompleteRide = () => {
+  const handleCompleteRide = async () => {
     const contractNum = `DS-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const completedRide = {
       ...ride,
@@ -64,9 +65,25 @@ export default function RideInProgress({ currentRide, driver, setDriver, setRide
       payment_method: paymentMethod,
       date: new Date().toISOString(),
       status: 'completed',
-      company_name: driver.razao_social,
-      cnpj: driver.cnpj
+      company_name: driver?.razao_social || 'Motorista PJ',
+      cnpj: driver?.cnpj || '00.000.000/0001-00'
     };
+
+    // Atualiza no Supabase (status, contrato digital e carteira BaaS)
+    try {
+      if (ride.id) {
+        await updateRideStatus(ride.id, 'completed', {
+          driver_id: driver?.id,
+          total_price: completedRide.total_price
+        });
+        await apiCreateContract(completedRide, driver || {});
+        if (driver?.wallet?.id) {
+          await apiDepositPix(driver.wallet.id, completedRide.total_price);
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao sincronizar finalização no Supabase:', err);
+    }
 
     // Credit full amount (100% driver revenue, 0% commission)
     setDriver(prev => {
@@ -96,7 +113,7 @@ export default function RideInProgress({ currentRide, driver, setDriver, setRide
       };
     });
 
-    setRidesHistory(prev => [completedRide, ...prev]);
+    setRidesHistory(prev => [completedRide, ...(prev || [])]);
     setIsFinished(true);
 
     setTimeout(() => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 
@@ -16,16 +16,17 @@ import DriverProfile from './pages/DriverProfile';
 import PassengerHome from './pages/PassengerHome';
 import AdminDashboard from './pages/AdminDashboard';
 
-// Mock Data
-import { INITIAL_RIDES_HISTORY } from './data/mockData';
 import { 
   getDriverProfile, 
   saveDriverProfile, 
   getStoredPlans, 
   saveStoredPlans, 
   getStoredSession, 
-  clearStoredSession 
+  clearStoredSession,
+  fetchLivePlans
 } from './services/storageService';
+import { apiGetRidesHistory, apiGetDriverProfile } from './services/supabase';
+import SupabaseConfigModal from './components/SupabaseConfigModal';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredSession());
@@ -44,11 +45,34 @@ export default function App() {
     return 'home';
   });
   
-  // Central State Persistente
+  // Central State Persistente (Sem Mocks)
   const [driver, setDriver] = useState(() => getDriverProfile());
   const [plans, setPlans] = useState(() => getStoredPlans());
-  const [ridesHistory, setRidesHistory] = useState(INITIAL_RIDES_HISTORY);
+  const [ridesHistory, setRidesHistory] = useState([]);
   const [currentRide, setCurrentRide] = useState(null);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+
+  // Carrega dados dinâmicos do Supabase ao iniciar
+  useEffect(() => {
+    // 1. Carrega os planos em tempo real
+    fetchLivePlans().then(livePlans => {
+      if (livePlans && livePlans.length > 0) {
+        setPlans(livePlans);
+      }
+    });
+
+    // 2. Se houver usuário autenticado, sincroniza os dados do Supabase
+    if (currentUser?.id) {
+      if (currentUser.role === 'driver') {
+        apiGetDriverProfile(currentUser.id).then(liveDriver => {
+          if (liveDriver) setDriver(liveDriver);
+        });
+      }
+      apiGetRidesHistory(currentUser.role === 'driver' ? driver?.id : null).then(rides => {
+        if (rides && rides.length > 0) setRidesHistory(rides);
+      });
+    }
+  }, [currentUser?.id]);
 
   const updateDriver = (driverOrUpdater) => {
     setDriver(prev => {
@@ -109,6 +133,7 @@ export default function App() {
         plans={plans}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenSupabaseConfig={() => setIsSupabaseModalOpen(true)}
       />
 
       {/* Main Pages Router */}
@@ -210,6 +235,7 @@ export default function App() {
             plans={plans}
             setPlans={updatePlans}
             setActivePage={setActivePage}
+            onOpenSupabaseConfig={() => setIsSupabaseModalOpen(true)}
           />
         )}
       </div>
@@ -222,6 +248,12 @@ export default function App() {
           currentRole={currentRole}
         />
       )}
+
+      {/* Modal de Conexão e Diagnóstico do Supabase */}
+      <SupabaseConfigModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+      />
 
     </div>
   );

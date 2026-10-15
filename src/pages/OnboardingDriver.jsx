@@ -6,28 +6,28 @@ export default function OnboardingDriver({ driver, setDriver, setActivePage, onR
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: driver.full_name || '',
-    phone: driver.phone || '',
-    email: driver.email || '',
+    full_name: driver?.full_name || '',
+    phone: driver?.phone || '',
+    email: driver?.email || '',
     password: '',
     confirmPassword: '',
     
     // Escudo Jurídico PJ Amplo
-    company_type: driver.company_type || 'ME', // MEI, ME, LTDA, SLU, EIRELI
-    cnpj: driver.cnpj || '',
-    razao_social: driver.razao_social || '',
-    nome_fantasia: driver.nome_fantasia || '',
-    inscricao_municipal: driver.inscricao_municipal || '',
+    company_type: driver?.company_type || 'ME', // MEI, ME, LTDA, SLU, EIRELI
+    cnpj: driver?.cnpj || '',
+    razao_social: driver?.razao_social || '',
+    nome_fantasia: driver?.nome_fantasia || '',
+    inscricao_municipal: driver?.inscricao_municipal || '',
     
     // Veículo
-    car_model: driver.car_model || '',
-    car_plate: driver.car_plate || '',
-    car_color: driver.car_color || '',
-    car_year: driver.car_year || '2023',
+    car_model: driver?.car_model || '',
+    car_plate: driver?.car_plate || '',
+    car_color: driver?.car_color || '',
+    car_year: driver?.car_year || '2023',
     
     // Tarifas
-    base_price: driver.base_price || 6.00,
-    price_per_km: driver.price_per_km || 2.80,
+    base_price: driver?.base_price || 6.00,
+    price_per_km: driver?.price_per_km || 2.80,
   });
 
   const [errorMsg, setErrorMsg] = useState('');

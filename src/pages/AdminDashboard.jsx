@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
   DollarSign, 
@@ -13,14 +13,23 @@ import {
   Building2,
   Clock,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Database
 } from 'lucide-react';
-import { getAdminDrivers, saveAdminDrivers } from '../services/storageService';
+import { getAdminDrivers, saveAdminDrivers, fetchLiveAdminDrivers } from '../services/storageService';
 
-export default function AdminDashboard({ plans, setPlans, setActivePage }) {
+export default function AdminDashboard({ plans, setPlans, setActivePage, onOpenSupabaseConfig }) {
   const [editablePlans, setEditablePlans] = useState(JSON.parse(JSON.stringify(plans)));
   const [driversList, setDriversList] = useState(() => getAdminDrivers());
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    fetchLiveAdminDrivers().then(list => {
+      if (list && list.length > 0) {
+        setDriversList(list);
+      }
+    });
+  }, []);
 
   const handlePriceChange = (planId, newPrice) => {
     setEditablePlans(prev => prev.map(p => {
@@ -83,12 +92,24 @@ export default function AdminDashboard({ plans, setPlans, setActivePage }) {
           </p>
         </div>
 
-        {saveSuccess && (
-          <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-500/20 text-green-400 border border-green-500/40 text-xs font-bold animate-fade-in self-start sm:self-auto">
-            <CheckCircle2 className="w-4 h-4" />
-            Tarifas Atualizadas em Todo o Sistema!
-          </span>
-        )}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {onOpenSupabaseConfig && (
+            <button
+              onClick={onOpenSupabaseConfig}
+              className="px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-2 transition-all shadow-md"
+            >
+              <Database className="w-4 h-4 text-emerald-400" />
+              <span>Conexão Supabase</span>
+            </button>
+          )}
+
+          {saveSuccess && (
+            <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-500/20 text-green-400 border border-green-500/40 text-xs font-bold animate-fade-in">
+              <CheckCircle2 className="w-4 h-4" />
+              Tarifas Atualizadas!
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Platform Overview Metrics */}

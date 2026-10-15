@@ -15,6 +15,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import PixModal from '../components/PixModal';
+import { apiDepositPix, apiWithdrawPix } from '../services/supabase';
 
 export default function Wallet({ driver, setDriver }) {
   const [filterType, setFilterType] = useState('all');
@@ -35,9 +36,17 @@ export default function Wallet({ driver, setDriver }) {
     return true;
   });
 
-  const handleConfirmDeposit = () => {
+  const handleConfirmDeposit = async () => {
     const val = parseFloat(depositAmount);
     if (isNaN(val) || val <= 0) return;
+
+    if (driver?.wallet?.id) {
+      try {
+        await apiDepositPix(driver.wallet.id, val);
+      } catch (err) {
+        console.warn('Erro ao registrar depósito no Supabase:', err);
+      }
+    }
 
     setDriver(prev => {
       const prevWallet = prev?.wallet || { available_balance: 0, pending_balance: 0, pix_keys: [], transactions: [] };
@@ -65,13 +74,21 @@ export default function Wallet({ driver, setDriver }) {
     setIsDepositModalOpen(false);
   };
 
-  const handleWithdraw = (e) => {
+  const handleWithdraw = async (e) => {
     e.preventDefault();
     const val = parseFloat(withdrawAmount);
     const available = driver?.wallet?.available_balance ?? 0;
     if (isNaN(val) || val <= 0 || val > available) {
       alert('Valor de saque inválido ou saldo insuficiente.');
       return;
+    }
+
+    if (driver?.wallet?.id) {
+      try {
+        await apiWithdrawPix(driver.wallet.id, val, withdrawKey);
+      } catch (err) {
+        console.warn('Erro ao processar saque no Supabase:', err);
+      }
     }
 
     setDriver(prev => {
@@ -126,7 +143,7 @@ export default function Wallet({ driver, setDriver }) {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors self-start sm:self-auto"
         >
           <Key className="w-3.5 h-3.5 text-green-400" />
-          Minhas Chaves Pix ({driver.wallet.pix_keys?.length || 0})
+          Minhas Chaves Pix ({driver?.wallet?.pix_keys?.length || 0})
         </button>
       </div>
 
@@ -349,7 +366,7 @@ export default function Wallet({ driver, setDriver }) {
             </div>
 
             <div className="space-y-2">
-              {driver.wallet.pix_keys?.map((k, i) => (
+              {driver?.wallet?.pix_keys?.map((k, i) => (
                 <div key={i} className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-bold text-green-400 uppercase">{k.type} {k.default ? '(Padrão)' : ''}</span>
