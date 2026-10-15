@@ -24,35 +24,77 @@ export const getDeviceLocation = () => {
   });
 };
 
-// 2. Busca e autocompletar de endereços reais no Brasil (OpenStreetMap Nominatim)
+// Dicionário de atalhos rápidos para pontos de referência populares
+const POPULAR_PLACES = [
+  { keywords: ['paulista', 'av paulista', 'avenida paulista'], short_name: 'Av. Paulista, 1578 - Bela Vista, São Paulo', lat: -23.561684, lng: -46.655981 },
+  { keywords: ['congonhas', 'aeroporto congonhas', 'aeroporto de congonhas'], short_name: 'Aeroporto de Congonhas - Embarque, São Paulo', lat: -23.627325, lng: -46.656534 },
+  { keywords: ['faria lima', 'av faria lima', 'brigadeiro faria lima'], short_name: 'Av. Brig. Faria Lima, 3477 - Itaim Bibi, São Paulo', lat: -23.586612, lng: -46.682613 },
+  { keywords: ['ibirapuera', 'parque ibirapuera', 'shopping ibirapuera'], short_name: 'Shopping Ibirapuera - Moema, São Paulo', lat: -23.610214, lng: -46.666872 },
+  { keywords: ['guarulhos', 'gru', 'aeroporto guarulhos'], short_name: 'Aeroporto Internacional de Guarulhos (GRU)', lat: -23.435555, lng: -46.473055 },
+  { keywords: ['tiete', 'rodoviaria tiete'], short_name: 'Terminal Rodoviário Tietê, São Paulo', lat: -23.516245, lng: -46.624792 },
+  { keywords: ['vila olimpia', 'vila olímpia'], short_name: 'Vila Olímpia - São Paulo, SP', lat: -23.593721, lng: -46.685324 },
+  { keywords: ['morumbi', 'shopping morumbi'], short_name: 'Morumbi Shopping - Av. Roque Petroni Jr, São Paulo', lat: -23.622812, lng: -46.698944 }
+];
+
+// 2. Busca e autocompletar de endereços reais no Brasil
 export const searchAddressNominatim = async (query) => {
-  if (!query || query.trim().length < 3) return [];
+  if (!query || query.trim().length < 2) return [];
+
+  const clean = query.trim().toLowerCase();
+  
+  // 1. Checa correspondência rápida no catálogo de locais populares
+  const matchedShortcuts = POPULAR_PLACES.filter(p => 
+    p.keywords.some(k => k.includes(clean) || clean.includes(k))
+  ).map(p => ({
+    display_name: p.short_name,
+    short_name: p.short_name,
+    lat: p.lat,
+    lng: p.lng
+  }));
 
   try {
     const encoded = encodeURIComponent(query.trim());
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&countrycodes=br&limit=5&addressdetails=1`,
-      {
-        headers: {
-          'Accept-Language': 'pt-BR,pt;q=0.9',
-          'User-Agent': 'DriverSaaS-App'
-        }
+    
+    // Tenta primeiro o endpoint local/serverless /api/geocode (sem restrição de CORS)
+    let res = await fetch(`/api/geocode?q=${encoded}`);
+    
+    if (!res.ok) {
+      // Fallback para chamada direta sem headers restritos
+      res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&countrycodes=br&limit=6&addressdetails=1&email=suporte@driversaas.app`);
+    }
+
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const parsed = data.map((item) => ({
+          display_name: item.display_name,
+          short_name: formatShortAddress(item),
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon)
+        }));
+
+        // Junta atalhos correspondentes no topo sem duplicatas
+        const combined = [...matchedShortcuts];
+        parsed.forEach(item => {
+          if (!combined.some(c => Math.abs(c.lat - item.lat) < 0.001 && Math.abs(c.lng - item.lng) < 0.001)) {
+            combined.push(item);
+          }
+        });
+        return combined.slice(0, 6);
       }
-    );
-
-    if (!res.ok) return [];
-    const data = await res.json();
-
-    return data.map((item) => ({
-      display_name: item.display_name,
-      short_name: formatShortAddress(item),
-      lat: parseFloat(item.lat),
-      lng: parseFloat(item.lon)
-    }));
+    }
   } catch (err) {
-    console.error('Erro ao buscar endereço:', err);
-    return [];
+    console.warn('Busca de endereço via API falhou, usando lista local:', err);
   }
+
+  return matchedShortcuts;
+};
+
+// Geocodifica uma string de endereço diretamente para coordenadas
+export const geocodeAddress = async (query) => {
+  if (!query) return null;
+  const results = await searchAddressNominatim(query);
+  return results.length > 0 ? results[0] : null;
 };
 
 const formatShortAddress = (item) => {

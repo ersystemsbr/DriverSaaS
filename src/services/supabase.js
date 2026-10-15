@@ -663,46 +663,155 @@ export const createRideRequest = async (rideData) => {
   return payload;
 };
 
+export const apiGetPendingRides = async () => {
+  const client = initClient();
+  if (!client) return [];
+
+  try {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data, error } = await client
+      .from('xds_rides')
+      .select('*')
+      .eq('status', 'pending')
+      .gte('created_at', fiveMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(3);
+
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('apiGetPendingRides Supabase warning:', err);
+    return [];
+  }
+};
+
 export const subscribeToNewRides = (callback) => {
   const client = initClient();
+  let isSubscribed = true;
+  const seenRideIds = new Set();
 
+  const notifyRide = (ride) => {
+    if (!isSubscribed || !ride || !ride.id) return;
+    if (ride.status === 'pending' && !seenRideIds.has(ride.id)) {
+      seenRideIds.add(ride.id);
+      callback(ride);
+    }
+  };
+
+  // 1. Supabase Realtime Channel
+  let channel = null;
   if (client) {
     try {
-      const channel = client
-        .channel('public:xds_rides_channel')
+      const channelName = `xds_rides_pub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      channel = client
+        .channel(channelName)
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'xds_rides' },
+          { event: '*', schema: 'public', table: 'xds_rides' },
           (payload) => {
             if (payload.new && payload.new.status === 'pending') {
-              callback(payload.new);
+              notifyRide(payload.new);
             }
           }
         )
         .subscribe();
-
-      const localHandler = (event) => {
-        if (event.data?.type === 'NEW_RIDE') callback(event.data.ride);
-      };
-      if (localChannel) localChannel.addEventListener('message', localHandler);
-
-      return () => {
-        client.removeChannel(channel);
-        if (localChannel) localChannel.removeEventListener('message', localHandler);
-      };
     } catch (e) {
       console.warn('Supabase Realtime subscription error:', e);
     }
   }
 
-  // Fallback via BroadcastChannel
-  const handleLocal = (event) => {
-    if (event.data?.type === 'NEW_RIDE') callback(event.data.ride);
+  // 2. BroadcastChannel para sincronização instantânea na mesma aba/janela
+  const localHandler = (event) => {
+    if (event.data?.type === 'NEW_RIDE') {
+      notifyRide(event.data.ride);
+    }
   };
-  if (localChannel) localChannel.addEventListener('message', handleLocal);
+  if (localChannel) localChannel.addEventListener('message', localHandler);
+
+  // 3. Checagem inicial imediata de chamados pendentes
+  apiGetPendingRides().then(rides => {
+    if (rides && rides.length > 0) {
+      rides.forEach(notifyRide);
+    }
+  });
+
+  // 4. Polling inteligente a cada 2.5s como garantia contra quedas de WebSocket
+  const pollTimer = setInterval(async () => {
+    if (!isSubscribed) return;
+    const rides = await apiGetPendingRides();
+    if (rides && rides.length > 0) {
+      rides.forEach(notifyRide);
+    }
+  }, 2500);
 
   return () => {
-    if (localChannel) localChannel.removeEventListener('message', handleLocal);
+    isSubscribed = false;
+    clearInterval(pollTimer);
+    if (channel && client) client.removeChannel(channel);
+    if (localChannel) localChannel.removeEventListener('message', localHandler);
+  };
+};
+
+export const subscribeToRide = (rideId, callback) => {
+  if (!rideId) return () => {};
+  const client = initClient();
+  let isSubscribed = true;
+  let lastStatus = null;
+
+  const handleUpdate = (ride) => {
+    if (!isSubscribed || !ride) return;
+    if (ride.id === rideId && ride.status !== lastStatus) {
+      lastStatus = ride.status;
+      callback(ride);
+    }
+  };
+
+  // 1. Supabase Realtime
+  let channel = null;
+  if (client) {
+    try {
+      const channelName = `ride_${rideId}_${Date.now()}`;
+      channel = client
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'xds_rides', filter: `id=eq.${rideId}` },
+          (payload) => {
+            if (payload.new) handleUpdate(payload.new);
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('subscribeToRide realtime error:', e);
+    }
+  }
+
+  // 2. BroadcastChannel
+  const localHandler = (event) => {
+    if (event.data?.type === 'RIDE_STATUS_CHANGED' && event.data.rideId === rideId) {
+      handleUpdate({ id: rideId, status: event.data.status, ...event.data });
+    }
+  };
+  if (localChannel) localChannel.addEventListener('message', localHandler);
+
+  // 3. Fallback Polling a cada 2.5s
+  const pollTimer = setInterval(async () => {
+    if (!isSubscribed || !client) return;
+    try {
+      const { data } = await client
+        .from('xds_rides')
+        .select('*')
+        .eq('id', rideId)
+        .single();
+      if (data) handleUpdate(data);
+    } catch (e) {}
+  }, 2500);
+
+  return () => {
+    isSubscribed = false;
+    clearInterval(pollTimer);
+    if (channel && client) client.removeChannel(channel);
+    if (localChannel) localChannel.removeEventListener('message', localHandler);
   };
 };
 
@@ -716,10 +825,24 @@ export const updateRideStatus = async (rideId, status, extraData = {}) => {
 
   if (client && rideId) {
     try {
-      await client
+      const { error } = await client
         .from('xds_rides')
         .update(updatePayload)
         .eq('id', rideId);
+
+      if (error) {
+        console.warn('updateRideStatus fallback para colunas padrão de xds_rides:', error.message);
+        const safePayload = {
+          status,
+          ...(extraData.driver_id ? { driver_id: extraData.driver_id } : {}),
+          ...(extraData.total_price ? { total_price: extraData.total_price } : {}),
+          completed_at: status === 'completed' ? new Date().toISOString() : undefined
+        };
+        await client
+          .from('xds_rides')
+          .update(safePayload)
+          .eq('id', rideId);
+      }
     } catch (e) {
       console.error('updateRideStatus Supabase Error:', e);
     }

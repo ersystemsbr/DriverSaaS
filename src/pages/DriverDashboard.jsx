@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import RealMap from '../components/RealMap';
 import { getDeviceLocation } from '../services/mapService';
-import { subscribeToNewRides } from '../services/supabase';
+import { subscribeToNewRides, updateRideStatus } from '../services/supabase';
 
 export default function DriverDashboard({ driver, setDriver, setActivePage, setCurrentRide }) {
   const [isOnline, setIsOnline] = useState(false);
@@ -29,6 +29,71 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
   const [driverCoords, setDriverCoords] = useState({ lat: -23.561684, lng: -46.655981 });
 
   const isSubActive = driver?.subscription_status === 'active';
+
+  // Áudio Context e Ringtone Contínuo (Toca até o motorista atender)
+  const audioCtxRef = React.useRef(null);
+  const ringIntervalRef = React.useRef(null);
+
+  const initAudio = () => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    } catch (e) {}
+  };
+
+  const playChimeBurst = () => {
+    try {
+      initAudio();
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+      // 3 tons harmônicos energéticos (Toque de Chamada do DriverSaaS)
+      const freqs = [659.25, 880.00, 1174.66]; // E5, A5, D6
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+        
+        gain.gain.setValueAtTime(0, now + idx * 0.12);
+        gain.gain.linearRampToValueAtTime(0.45, now + idx * 0.12 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.28);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.12);
+        osc.stop(now + idx * 0.12 + 0.3);
+      });
+
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([350, 150, 350, 150, 450]);
+      }
+    } catch (e) {}
+  };
+
+  const startRinging = () => {
+    playChimeBurst();
+    if (ringIntervalRef.current) clearInterval(ringIntervalRef.current);
+    ringIntervalRef.current = setInterval(() => {
+      playChimeBurst();
+    }, 1400);
+  };
+
+  const stopRinging = () => {
+    if (ringIntervalRef.current) {
+      clearInterval(ringIntervalRef.current);
+      ringIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => stopRinging();
+  }, []);
 
   // 1. Detectar GPS real do motorista no carregamento
   useEffect(() => {
@@ -39,50 +104,36 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
 
   // 2. Escutar chamadas de passageiros em tempo real quando estiver online
   useEffect(() => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      stopRinging();
+      setIncomingRide(null);
+      return;
+    }
 
     const unsubscribe = subscribeToNewRides((newRide) => {
       setIncomingRide({
-        id: newRide.id || `ride_${Date.now().toString().slice(-4)}`,
-        passenger_name: newRide.passenger_name || "Mariana Albuquerque",
+        id: newRide.id || `ride_${Date.now()}`,
+        contract_number: newRide.contract_number,
+        passenger_name: newRide.passenger_name || "Passageiro Particular",
         passenger_phone: newRide.passenger_phone || "(11) 98877-6655",
         origin: newRide.origin_address || newRide.origin,
         destination: newRide.destination_address || newRide.destination,
-        distance_km: newRide.distance_km || 8.5,
-        duration_min: newRide.duration_min || 20,
-        total_price: newRide.total_price || 42.00,
+        distance_km: parseFloat(newRide.distance_km || 8.5),
+        duration_min: parseInt(newRide.duration_min || 20, 10),
+        total_price: parseFloat(newRide.total_price || 42.00),
         payment_method: newRide.payment_method || "Pix Direto",
         date: newRide.created_at || newRide.date || new Date().toISOString()
       });
 
-      // Alerta sonoro sutil via Web Audio API e vibração
-      playChime();
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate([200, 100, 200]);
-      }
+      // Começa a tocar repetidamente no celular
+      startRinging();
     });
 
     return () => {
+      stopRinging();
       if (unsubscribe) unsubscribe();
     };
   }, [isOnline]);
-
-  const playChime = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3); // A5
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.5);
-    } catch (e) {}
-  };
 
   const showToast = (msg) => {
     setNotificationMsg(msg);
@@ -90,6 +141,8 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
   };
 
   const handleToggleOnline = async () => {
+    initAudio(); // Desbloqueia o áudio imediatamente com o clique do usuário
+
     if (!isSubActive) {
       showToast('Sua assinatura está inativa. Renove seu plano para ficar online.');
       setActivePage('subscription');
@@ -102,14 +155,16 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
     if (nextState) {
       const coords = await getDeviceLocation();
       setDriverCoords(coords);
-      showToast('Você está ONLINE! Aguardando chamadas de passageiros com GPS ativo...');
+      showToast('Você está ONLINE! Aguardando chamadas com alerta sonoro ativado...');
     } else {
+      stopRinging();
       setIncomingRide(null);
       showToast('Você está offline.');
     }
   };
 
   const triggerSimulatedRide = () => {
+    initAudio();
     setIncomingRide({
       id: `ride_${Date.now().toString().slice(-4)}`,
       passenger_name: "Mariana Albuquerque",
@@ -122,18 +177,48 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
       payment_method: "Pix Direto",
       date: new Date().toISOString()
     });
-    playChime();
+    startRinging();
   };
 
-  const handleAcceptRide = () => {
+  const handleAcceptRide = async () => {
     if (!incomingRide) return;
-    setCurrentRide(incomingRide);
+    stopRinging();
+
+    const acceptedRide = {
+      ...incomingRide,
+      status: 'accepted',
+      driver_id: driver?.id,
+      driver_name: driver?.full_name,
+      driver_car: driver?.car_model,
+      driver_plate: driver?.car_plate,
+      driver_phone: driver?.phone,
+      company_name: driver?.razao_social,
+      cnpj: driver?.cnpj
+    };
+
+    // 1. Atualiza no Supabase para que o celular do passageiro receba o aceite
+    try {
+      await updateRideStatus(incomingRide.id, 'accepted', {
+        driver_id: driver?.id,
+        driver_name: driver?.full_name,
+        driver_car: driver?.car_model,
+        driver_plate: driver?.car_plate,
+        driver_phone: driver?.phone,
+        company_name: driver?.razao_social,
+        cnpj: driver?.cnpj
+      });
+    } catch (e) {
+      console.warn('Erro ao atualizar aceite da corrida no Supabase:', e);
+    }
+
+    setCurrentRide(acceptedRide);
     setIncomingRide(null);
-    showToast('Corrida aceita! Gerando contrato de transporte...');
+    showToast('Corrida aceita! Abrindo rota de navegação...');
     setActivePage('ride_in_progress');
   };
 
   const handleRejectRide = () => {
+    stopRinging();
     setIncomingRide(null);
     showToast('Chamada recusada.');
   };

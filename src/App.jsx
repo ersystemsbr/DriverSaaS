@@ -203,6 +203,8 @@ export default function App() {
             setDriver={updateDriver}
             setRidesHistory={setRidesHistory}
             setActivePage={setActivePage}
+            currentRole={currentRole}
+            currentUser={currentUser}
           />
         )}
 
