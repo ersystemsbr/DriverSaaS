@@ -22,8 +22,18 @@ import RealMap from '../components/RealMap';
 import { getDeviceLocation } from '../services/mapService';
 import { subscribeToNewRides, updateRideStatus } from '../services/supabase';
 
-export default function DriverDashboard({ driver, setDriver, setActivePage, setCurrentRide }) {
-  const [isOnline, setIsOnline] = useState(false);
+export default function DriverDashboard({ 
+  driver, 
+  setDriver, 
+  setActivePage, 
+  setCurrentRide,
+  isOnline: propIsOnline,
+  setIsOnline: propSetIsOnline
+}) {
+  const [internalOnline, setInternalOnline] = useState(false);
+  const isOnline = propIsOnline !== undefined ? propIsOnline : internalOnline;
+  const setIsOnline = propSetIsOnline !== undefined ? propSetIsOnline : setInternalOnline;
+
   const [incomingRide, setIncomingRide] = useState(null);
   const [notificationMsg, setNotificationMsg] = useState('');
   const [driverCoords, setDriverCoords] = useState({ lat: -23.561684, lng: -46.655981 });
@@ -235,80 +245,56 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
       )}
 
       {/* Driver Header Profile Banner */}
-      <section className="bg-zinc-950 border-b border-zinc-800/80 px-4 py-4">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <section className="bg-zinc-950 border-b border-zinc-800/80 px-4 py-3">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-bold text-lg shadow-inner">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            {/* Botão Online/Offline menor e na frente dos dados do motorista */}
+            <button
+              onClick={handleToggleOnline}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md flex-shrink-0 active:scale-95 ${
+                isOnline
+                  ? 'bg-green-500 text-black shadow-green-500/25 hover:bg-green-400'
+                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
+              }`}
+              title={isOnline ? 'Clique para ficar Offline' : 'Clique para ficar Online'}
+            >
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-black animate-pulse' : 'bg-zinc-600'}`} />
+              <span>{isOnline ? 'Online' : 'Offline'}</span>
+            </button>
+
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-bold text-xs sm:text-sm shadow-inner flex-shrink-0">
               {(driver?.full_name || 'MO').slice(0, 2).toUpperCase()}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white leading-tight">{driver?.full_name || 'Motorista'}</h2>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/30">
-                  {driver?.company_type || 'PJ'} • CNPJ Ativo
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h2 className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[220px]">
+                  {driver?.full_name || 'Motorista'}
+                </h2>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-500/10 text-green-400 border border-green-500/30">
+                  {driver?.company_type || 'PJ'}
                 </span>
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
-                <span>{driver?.car_model || 'Veículo'}</span>
-                <span>•</span>
-                <span className="font-mono font-semibold text-zinc-300">{driver?.car_plate || '---'}</span>
+              <p className="text-[11px] text-zinc-400 truncate">
+                {driver?.car_model || 'Veículo'} • <span className="font-mono text-zinc-300">{driver?.car_plate || '---'}</span>
               </p>
             </div>
           </div>
 
-          {/* Online Toggle Button */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleToggleOnline}
-              className={`w-full sm:w-auto px-5 py-3 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2.5 transition-all shadow-lg ${
-                isOnline
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30 shadow-red-500/10'
-                  : 'bg-green-500 text-black hover:bg-green-600 shadow-green-500/25 hover:scale-[1.02]'
-              }`}
-            >
-              <Power className="w-4 h-4" />
-              <span>{isOnline ? 'FICAR OFFLINE' : 'FICAR ONLINE'}</span>
-            </button>
+          {/* Faturamento do dia compacto à direita */}
+          <div className="text-right flex-shrink-0">
+            <span className="text-[10px] uppercase font-bold text-zinc-500 block">Hoje</span>
+            <span className="text-sm sm:text-base font-black text-green-400">
+              R$ {(driver?.today_earnings || 0).toFixed(2)}
+            </span>
           </div>
 
         </div>
       </section>
 
       {/* Main Content Area */}
-      <main className="max-w-4xl mx-auto px-4 pt-6 space-y-6">
-        
-        {/* Subscription Status Alert */}
-        {!isSubActive ? (
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <div>
-                <h4 className="text-sm font-bold text-white">Sua assinatura está inativa ou expirou</h4>
-                <p className="text-xs text-zinc-400">Ative seu plano para receber corridas particulares com taxa 0%.</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActivePage('subscription')}
-              className="px-3.5 py-2 rounded-xl bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 whitespace-nowrap"
-            >
-              Ver Planos
-            </button>
-          </div>
-        ) : (
-          <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-zinc-400">
-              <ShieldCheck className="w-4 h-4 text-green-400" />
-              <span>Assinatura <strong className="text-white">Plano {driver?.current_plan === 'daily' ? 'Diário' : driver?.current_plan === 'weekly' ? 'Semanal' : driver?.current_plan === 'yearly' ? 'Anual' : 'Mensal'}</strong> ativa até {new Date(driver?.subscription_expires_at || Date.now()).toLocaleDateString('pt-BR')}</span>
-            </div>
-            <button
-              onClick={() => setActivePage('subscription')}
-              className="text-green-400 hover:text-green-300 font-semibold flex items-center gap-1"
-            >
-              Gerenciar <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+      <main className="max-w-4xl mx-auto px-4 pt-4 sm:pt-6 space-y-5">
 
         {/* MAPA REAL LEAFLET COM RADAR E GPS */}
         <div className="space-y-2">

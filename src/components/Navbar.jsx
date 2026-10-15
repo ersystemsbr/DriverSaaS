@@ -47,15 +47,7 @@ export default function Navbar({
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-green-600 to-emerald-400 flex items-center justify-center text-black font-extrabold shadow-lg shadow-green-500/20 group-hover:scale-105 transition-transform">
             <Car className="w-5 h-5 text-black stroke-[2.2px]" />
           </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xl font-bold tracking-tight text-white">Driver<span className="text-green-500">SaaS</span></span>
-              <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-green-500/10 text-green-400 border border-green-500/30 rounded-md">
-                PJ Shield
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-400 leading-none">Taxa Zero • Contrato Eletrônico</p>
-          </div>
+          <span className="text-xl font-bold tracking-tight text-white">Driver<span className="text-green-500">SaaS</span></span>
         </div>
 
         {/* Right Action Items */}
@@ -97,31 +89,14 @@ export default function Navbar({
 
           {/* Usuário Logado vs Deslogado */}
           {currentUser ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  if (currentRole === 'driver') setActivePage('driver_profile');
-                  else if (currentRole === 'admin') setActivePage('admin_dashboard');
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-xs text-white"
-                title="Meu Perfil"
-              >
-                <div className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-300">
-                  {currentUser.name ? currentUser.name.slice(0, 1).toUpperCase() : 'U'}
-                </div>
-                <span className="hidden md:inline font-medium text-zinc-300 max-w-[120px] truncate">
-                  {currentUser.name}
-                </span>
-              </button>
-
-              <button
-                onClick={onLogout}
-                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/40 text-zinc-400 hover:text-red-400 transition-colors"
-                title="Sair da Conta"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/40 text-xs text-zinc-300 hover:text-red-400 transition-colors shadow-sm"
+              title="Sair da Conta"
+            >
+              <LogOut className="w-3.5 h-3.5 text-red-400" />
+              <span>Sair</span>
+            </button>
           ) : (
             <button
               onClick={() => setActivePage('login')}

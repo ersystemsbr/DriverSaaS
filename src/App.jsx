@@ -52,6 +52,16 @@ export default function App() {
   const [currentRide, setCurrentRide] = useState(null);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
+  // Status Online/Offline persistente do Motorista (não reseta ao concluir corrida)
+  const [isDriverOnline, setIsDriverOnline] = useState(() => {
+    return localStorage.getItem('xds_driver_online') === 'true';
+  });
+
+  const handleToggleDriverOnline = (val) => {
+    setIsDriverOnline(val);
+    localStorage.setItem('xds_driver_online', val ? 'true' : 'false');
+  };
+
   // Carrega dados dinâmicos do Supabase ao iniciar
   useEffect(() => {
     // 1. Carrega os planos em tempo real
@@ -105,6 +115,8 @@ export default function App() {
   const handleLogout = () => {
     clearStoredSession();
     setCurrentUser(null);
+    setIsDriverOnline(false);
+    localStorage.removeItem('xds_driver_online');
     setActivePage('home');
   };
 
@@ -177,6 +189,8 @@ export default function App() {
             setDriver={updateDriver}
             setActivePage={setActivePage}
             setCurrentRide={setCurrentRide}
+            isOnline={isDriverOnline}
+            setIsOnline={handleToggleDriverOnline}
           />
         )}
 
