@@ -31,12 +31,34 @@ export default async function handler(req, res) {
       }
     });
 
-    if (!osmRes.ok) {
-      return res.status(200).json([]);
+    let data = [];
+    if (osmRes.ok) {
+      data = await osmRes.json();
     }
 
-    const data = await osmRes.json();
-    return res.status(200).json(data);
+    // Se não encontrou e a busca contém número ou complemento, tenta buscar o logradouro
+    if ((!Array.isArray(data) || data.length === 0) && (/\d+/.test(query) || query.includes('-') || query.includes(','))) {
+      const cleanStreet = query
+        .replace(/,\s*\d+.*$/, '')
+        .replace(/\b\d+\b.*$/, '')
+        .replace(/-.*$/, '')
+        .trim();
+
+      if (cleanStreet.length >= 3) {
+        const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanStreet)}&countrycodes=br&limit=6&addressdetails=1&email=suporte@driversaas.app`;
+        const fbRes = await fetch(fallbackUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://driversaas.vercel.app'
+          }
+        });
+        if (fbRes.ok) {
+          data = await fbRes.json();
+        }
+      }
+    }
+
+    return res.status(200).json(Array.isArray(data) ? data : []);
   } catch (err) {
     console.error('Erro na geocodificação serverless:', err);
     return res.status(200).json([]);

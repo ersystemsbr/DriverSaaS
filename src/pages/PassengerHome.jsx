@@ -25,11 +25,11 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
   
   // GPS e Coordenadas
   const [deviceCoords, setDeviceCoords] = useState({ lat: -23.561684, lng: -46.655981 });
-  const [origin, setOrigin] = useState('Av. Paulista, 1578 - Bela Vista, São Paulo');
+  const [origin, setOrigin] = useState('Minha Localização Atual (GPS)');
   const [originCoords, setOriginCoords] = useState({ lat: -23.561684, lng: -46.655981 });
   
-  const [destination, setDestination] = useState('Aeroporto de Congonhas - Embarque, São Paulo');
-  const [destCoords, setDestCoords] = useState({ lat: -23.627325, lng: -46.656534 });
+  const [destination, setDestination] = useState('');
+  const [destCoords, setDestCoords] = useState(null);
   
   // Sugestões de Autocomplete
   const [originSuggestions, setOriginSuggestions] = useState([]);
@@ -52,11 +52,14 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
   const [countdown, setCountdown] = useState(30);
   const [callSuccess, setCallSuccess] = useState(false);
 
-  // 1. Obter GPS real do passageiro no carregamento
+  // 1. Obter GPS real do passageiro no carregamento imediato
   useEffect(() => {
     getDeviceLocation().then((coords) => {
-      setDeviceCoords(coords);
-      setOriginCoords(coords);
+      if (coords) {
+        setDeviceCoords(coords);
+        setOriginCoords(coords);
+        setOrigin('Minha Localização Atual (GPS)');
+      }
     });
   }, []);
 
@@ -77,6 +80,8 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
         setRouteData(res);
         setIsCalculatingRoute(false);
       });
+    } else {
+      setRouteData(null);
     }
   }, [originCoords?.lat, originCoords?.lng, destCoords?.lat, destCoords?.lng]);
 
@@ -253,12 +258,19 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
   };
 
   // Cálculo de Preço (Base + Preço/Km da Tabela do Motorista)
-  const distanceKm = routeData?.distanceKm || 8.5;
-  const durationMin = routeData?.durationMin || 22;
-  const estimatedPrice = (driver?.base_price || 6.00) + (distanceKm * (driver?.price_per_km || 2.80));
+  const hasDestination = Boolean(destCoords && destination.trim());
+  const distanceKm = hasDestination && routeData?.distanceKm ? routeData.distanceKm : 0;
+  const durationMin = hasDestination && routeData?.durationMin ? routeData.durationMin : 0;
+  const estimatedPrice = hasDestination 
+    ? (driver?.base_price || 6.00) + (distanceKm * (driver?.price_per_km || 2.80))
+    : 0;
 
   // Solicitar Corrida (Despacho Realtime e Notificação do Motorista)
   const handleStartDispatch = async () => {
+    if (!hasDestination) {
+      alert('Por favor, informe e selecione um destino para chamar o motorista.');
+      return;
+    }
     setIsCalling(true);
     setCallSuccess(false);
     setAcceptedDriverInfo(null);
@@ -492,6 +504,10 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 Atualizando rota no mapa...
               </span>
+            ) : !hasDestination ? (
+              <span className="text-zinc-500 italic">
+                Digite o destino desejado para calcular a rota e o preço
+              </span>
             ) : (
               <>
                 <span>Distância: <strong className="text-white">{distanceKm} km</strong></span>
@@ -501,7 +517,9 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
             )}
           </div>
           <div className="text-right">
-            <span className="text-xl font-black text-green-400">R$ {estimatedPrice.toFixed(2)}</span>
+            <span className="text-xl font-black text-green-400">
+              {!hasDestination ? 'R$ --,--' : `R$ ${estimatedPrice.toFixed(2)}`}
+            </span>
             <span className="text-[10px] text-zinc-500 block">Preço Fechado PJ (0% Taxa)</span>
           </div>
         </div>
@@ -588,10 +606,15 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
         {!isCalling ? (
           <button
             onClick={handleStartDispatch}
-            className="w-full py-4 rounded-2xl bg-green-500 hover:bg-green-600 text-black text-sm font-extrabold shadow-xl shadow-green-500/25 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95"
+            disabled={!hasDestination}
+            className={`w-full py-4 rounded-2xl text-sm font-extrabold shadow-xl transition-all flex items-center justify-center gap-2 ${
+              !hasDestination
+                ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50'
+                : 'bg-green-500 hover:bg-green-600 text-black shadow-green-500/25 hover:scale-[1.01] active:scale-95'
+            }`}
           >
-            <Car className="w-5 h-5 text-black stroke-[2.5px]" />
-            SOLICITAR TRANSPORTE PARTICULAR
+            <Car className="w-5 h-5 text-current stroke-[2.5px]" />
+            {!hasDestination ? 'DIGITE O DESTINO PARA CHAMAR' : 'SOLICITAR TRANSPORTE PARTICULAR'}
           </button>
         ) : (
           <div className="p-6 rounded-3xl bg-zinc-900 border-2 border-green-500 shadow-2xl text-center space-y-4 animate-fade-in">

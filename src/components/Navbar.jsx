@@ -59,7 +59,14 @@ export default function Navbar({
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-green-600 to-emerald-400 flex items-center justify-center text-black font-extrabold shadow-lg shadow-green-500/20 group-hover:scale-105 transition-transform">
             <Car className="w-5 h-5 text-black stroke-[2.2px]" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-white">Driver<span className="text-green-500">SaaS</span></span>
+          <div>
+            <span className="text-xl font-bold tracking-tight text-white leading-tight block">Driver<span className="text-green-500">SaaS</span></span>
+            {currentUser && (
+              <span className="text-[11px] font-medium text-zinc-400 leading-none block mt-0.5">
+                {currentRole === 'passenger' ? 'Passageiro' : currentRole === 'driver' ? 'Motorista' : 'Administrador'}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Right Action Items */}

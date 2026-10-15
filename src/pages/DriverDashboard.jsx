@@ -282,28 +282,20 @@ export default function DriverDashboard({
             </div>
           </div>
 
-          {/* Faturamento do dia compacto à direita */}
-          <div className="text-right flex-shrink-0">
-            <span className="text-[10px] uppercase font-bold text-zinc-500 block">Hoje</span>
-            <span className="text-sm sm:text-base font-black text-green-400">
-              R$ {(driver?.today_earnings || 0).toFixed(2)}
-            </span>
-          </div>
-
         </div>
       </section>
 
       {/* Main Content Area */}
       <main className="max-w-4xl mx-auto px-4 pt-4 sm:pt-6 space-y-5">
 
-        {/* MAPA REAL LEAFLET COM RADAR E GPS */}
+        {/* MAPA REAL LEAFLET COM RADAR E GPS (Altura Expandida) */}
         <div className="space-y-2">
           <RealMap 
             center={[driverCoords.lat, driverCoords.lng]}
             driverCoords={driverCoords}
             isOnline={isOnline}
             zoom={14}
-            height="260px"
+            height="380px"
           />
 
           <div className="flex items-center justify-between text-[11px] text-zinc-400 px-1">
@@ -382,32 +374,6 @@ export default function DriverDashboard({
 
           </div>
         )}
-
-        {/* Digital Account / Wallet Quick Card */}
-        <div className="p-5 rounded-3xl bg-zinc-950 border border-zinc-800 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="text-xs uppercase font-semibold text-zinc-400 flex items-center gap-1.5">
-              <Wallet className="w-4 h-4 text-green-400" />
-              Conta Digital DriverSaaS
-            </span>
-            <div className="text-3xl font-black text-white">
-              R$ {(driver?.wallet?.available_balance ?? driver?.wallet_balance ?? 0).toFixed(2)}
-            </div>
-            <p className="text-xs text-zinc-400">
-              Chave Pix Ativa: <span className="font-mono text-zinc-300">{driver?.cnpj || 'Não informada'}</span> (CNPJ da empresa)
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => setActivePage('wallet')}
-              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-            >
-              Extrato & Pix
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
 
         {/* Metrics Overview Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
