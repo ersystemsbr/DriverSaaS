@@ -623,15 +623,14 @@ export const createRideRequest = async (rideData) => {
   const rideId = `ride_${Date.now()}`;
   const contractNumber = `DS-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  const payload = {
+  // Payload seguro com colunas exatas da tabela xds_rides (PostgreSQL)
+  const dbPayload = {
     id: rideId,
     contract_number: contractNumber,
     passenger_name: rideData.passenger_name || 'Passageiro',
     passenger_phone: rideData.passenger_phone || '(11) 98877-6655',
     origin_address: rideData.origin_address || rideData.origin || 'Origem',
     destination_address: rideData.destination_address || rideData.destination || 'Destino',
-    origin_coords: rideData.origin_coords || null,
-    dest_coords: rideData.dest_coords || null,
     distance_km: parseFloat(rideData.distance_km || 8.5),
     duration_min: parseInt(rideData.duration_min || 20, 10),
     total_price: parseFloat(rideData.total_price || 35.00),
@@ -641,17 +640,30 @@ export const createRideRequest = async (rideData) => {
     created_at: new Date().toISOString()
   };
 
+  const fullPayload = {
+    ...dbPayload,
+    origin_coords: rideData.origin_coords || null,
+    dest_coords: rideData.dest_coords || null
+  };
+
   if (client) {
     try {
       const { data, error } = await client
         .from('xds_rides')
-        .insert([payload])
+        .insert([dbPayload])
         .select()
         .single();
 
       if (!error && data) {
-        if (localChannel) localChannel.postMessage({ type: 'NEW_RIDE', ride: data });
-        return data;
+        const returnedRide = {
+          ...data,
+          origin_coords: rideData.origin_coords || null,
+          dest_coords: rideData.dest_coords || null
+        };
+        if (localChannel) localChannel.postMessage({ type: 'NEW_RIDE', ride: returnedRide });
+        return returnedRide;
+      } else if (error) {
+        console.warn('createRideRequest Supabase insert error:', error.message);
       }
     } catch (e) {
       console.warn('createRideRequest Supabase fallback:', e);
@@ -659,10 +671,10 @@ export const createRideRequest = async (rideData) => {
   }
 
   if (localChannel) {
-    localChannel.postMessage({ type: 'NEW_RIDE', ride: payload });
+    localChannel.postMessage({ type: 'NEW_RIDE', ride: fullPayload });
   }
 
-  return payload;
+  return fullPayload;
 };
 
 export const apiGetPendingRides = async () => {
@@ -670,14 +682,12 @@ export const apiGetPendingRides = async () => {
   if (!client) return [];
 
   try {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data, error } = await client
       .from('xds_rides')
       .select('*')
       .eq('status', 'pending')
-      .gte('created_at', fiveMinutesAgo)
       .order('created_at', { ascending: false })
-      .limit(3);
+      .limit(5);
 
     if (error) throw error;
     return data || [];

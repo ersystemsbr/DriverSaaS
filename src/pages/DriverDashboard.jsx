@@ -52,17 +52,35 @@ export default function DriverDashboard({
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
       }
     } catch (e) {}
   };
+
+  // Desbloqueia áudio no primeiro clique ou toque do motorista na tela
+  useEffect(() => {
+    const unlockAudio = () => {
+      initAudio();
+    };
+    window.addEventListener('click', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+    window.addEventListener('pointerdown', unlockAudio, { passive: true });
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('pointerdown', unlockAudio);
+    };
+  }, []);
 
   const playChimeBurst = () => {
     try {
       initAudio();
       const ctx = audioCtxRef.current;
       if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
 
       const now = ctx.currentTime;
       // 3 tons harmônicos energéticos (Toque de Chamada do DriverSaaS)
@@ -205,14 +223,12 @@ export default function DriverDashboard({
         const geoO = await geocodeAddress(incomingRide.origin);
         if (geoO) {
           orig = { lat: geoO.lat, lng: geoO.lng };
-          setIncomingRide(prev => prev ? { ...prev, origin_coords: orig } : null);
         }
       }
       if (!dest && incomingRide.destination) {
         const geoD = await geocodeAddress(incomingRide.destination);
         if (geoD) {
           dest = { lat: geoD.lat, lng: geoD.lng };
-          setIncomingRide(prev => prev ? { ...prev, dest_coords: dest } : null);
         }
       }
 

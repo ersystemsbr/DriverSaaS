@@ -75,7 +75,7 @@ export default function Navbar({
         <div className="flex items-center gap-2.5 sm:gap-3">
           
           {/* Botão Online/Offline no Topo no lugar do Conectado (apenas para Motorista) */}
-          {currentUser && currentRole === 'driver' && (
+          {currentRole === 'driver' && (
             <button
               onClick={onToggleDriverOnline}
               className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md flex-shrink-0 active:scale-95 ${

@@ -54,7 +54,8 @@ export default function App() {
 
   // Status Online/Offline persistente do Motorista (não reseta ao concluir corrida)
   const [isDriverOnline, setIsDriverOnline] = useState(() => {
-    return localStorage.getItem('xds_driver_online') === 'true';
+    const stored = localStorage.getItem('xds_driver_online');
+    return stored === null ? true : stored === 'true';
   });
 
   const handleToggleDriverOnline = (val) => {
