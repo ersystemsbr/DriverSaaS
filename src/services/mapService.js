@@ -184,3 +184,39 @@ const calculateHaversineDistance = (coord1, coord2) => {
   const straightDist = R * c;
   return +(straightDist * 1.35).toFixed(1); // Fator de ruas
 };
+
+// 4. Rota real com múltiplas paradas (ex: [Motorista, Embarque, Destino Final])
+export const calculateMultiPointRoute = async (points = []) => {
+  const valid = points.filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number');
+  if (valid.length < 2) return null;
+
+  try {
+    const coordsStr = valid.map(p => `${p.lng},${p.lat}`).join(';');
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Falha no cálculo multi-ponto OSRM');
+
+    const data = await res.json();
+    if (!data.routes || data.routes.length === 0) {
+      throw new Error('Nenhuma rota encontrada');
+    }
+
+    const route = data.routes[0];
+    const distanceKm = +(route.distance / 1000).toFixed(1);
+    const durationMin = Math.ceil(route.duration / 60);
+    const coordinates = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+
+    return {
+      distanceKm,
+      durationMin,
+      coordinates
+    };
+  } catch (e) {
+    console.warn('Erro ao consultar OSRM multi-ponto:', e);
+    return {
+      distanceKm: 0,
+      durationMin: 0,
+      coordinates: valid.map(p => [p.lat, p.lng])
+    };
+  }
+};

@@ -20,7 +20,7 @@ import {
   LogOut
 } from 'lucide-react';
 import RealMap from '../components/RealMap';
-import { getDeviceLocation, reverseGeocode } from '../services/mapService';
+import { getDeviceLocation, reverseGeocode, calculateMultiPointRoute, geocodeAddress } from '../services/mapService';
 import { subscribeToNewRides, updateRideStatus } from '../services/supabase';
 
 export default function DriverDashboard({ 
@@ -37,6 +37,7 @@ export default function DriverDashboard({
   const setIsOnline = propSetIsOnline !== undefined ? propSetIsOnline : setInternalOnline;
 
   const [incomingRide, setIncomingRide] = useState(null);
+  const [incomingRouteCoords, setIncomingRouteCoords] = useState(null);
   const [notificationMsg, setNotificationMsg] = useState('');
   const [driverCoords, setDriverCoords] = useState({ lat: -23.561684, lng: -46.655981 });
 
@@ -182,9 +183,58 @@ export default function DriverDashboard({
     } else {
       stopRinging();
       setIncomingRide(null);
+      setIncomingRouteCoords(null);
       showToast('Você está offline.');
     }
   };
+
+  // Traçar rota multi-ponto (Motorista -> Embarque -> Destino Final) quando houver chamada
+  useEffect(() => {
+    if (!incomingRide) {
+      setIncomingRouteCoords(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    const resolveIncomingRoute = async () => {
+      let orig = incomingRide.origin_coords;
+      let dest = incomingRide.dest_coords;
+
+      if (!orig && incomingRide.origin) {
+        const geoO = await geocodeAddress(incomingRide.origin);
+        if (geoO) {
+          orig = { lat: geoO.lat, lng: geoO.lng };
+          setIncomingRide(prev => prev ? { ...prev, origin_coords: orig } : null);
+        }
+      }
+      if (!dest && incomingRide.destination) {
+        const geoD = await geocodeAddress(incomingRide.destination);
+        if (geoD) {
+          dest = { lat: geoD.lat, lng: geoD.lng };
+          setIncomingRide(prev => prev ? { ...prev, dest_coords: dest } : null);
+        }
+      }
+
+      if (orig && dest && isMounted) {
+        const points = [
+          driverCoords,
+          orig,
+          dest
+        ];
+        const res = await calculateMultiPointRoute(points);
+        if (res && res.coordinates && isMounted) {
+          setIncomingRouteCoords(res.coordinates);
+        }
+      }
+    };
+
+    resolveIncomingRoute();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [incomingRide?.id, incomingRide?.origin, incomingRide?.destination, driverCoords.lat, driverCoords.lng]);
 
   const triggerSimulatedRide = () => {
     initAudio();
@@ -192,6 +242,8 @@ export default function DriverDashboard({
       id: `ride_${Date.now().toString().slice(-4)}`,
       origin: "Av. Brig. Faria Lima, 3477 - Itaim Bibi, São Paulo",
       destination: "Aeroporto de Congonhas - Embarque, São Paulo",
+      origin_coords: { lat: -23.586612, lng: -46.682613 },
+      dest_coords: { lat: -23.627325, lng: -46.656534 },
       distance_km: 7.8,
       duration_min: 20,
       total_price: 38.50,
@@ -204,10 +256,13 @@ export default function DriverDashboard({
   const handleAcceptRide = async () => {
     if (!incomingRide) return;
     stopRinging();
+    setIncomingRouteCoords(null);
 
     const acceptedRide = {
       ...incomingRide,
       status: 'accepted',
+      passenger_name: incomingRide.passenger_name || 'Passageiro Particular',
+      passenger_phone: incomingRide.passenger_phone || '',
       driver_id: driver?.id,
       driver_name: driver?.full_name,
       driver_car: driver?.car_model,
@@ -241,6 +296,7 @@ export default function DriverDashboard({
   const handleRejectRide = () => {
     stopRinging();
     setIncomingRide(null);
+    setIncomingRouteCoords(null);
     showToast('Chamada recusada.');
   };
 
@@ -255,70 +311,20 @@ export default function DriverDashboard({
         </div>
       )}
 
-      {/* Driver Header Profile Banner */}
-      <section className="bg-zinc-950 border-b border-zinc-800/80 px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            {/* Botão Online/Offline menor e na frente dos dados do motorista */}
-            <button
-              onClick={handleToggleOnline}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md flex-shrink-0 active:scale-95 ${
-                isOnline
-                  ? 'bg-green-500 text-black shadow-green-500/25 hover:bg-green-400'
-                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
-              }`}
-              title={isOnline ? 'Clique para ficar Offline' : 'Clique para ficar Online'}
-            >
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-black animate-pulse' : 'bg-zinc-600'}`} />
-              <span>{isOnline ? 'Online' : 'Offline'}</span>
-            </button>
+      {/* Main Content Area (Direto abaixo do topo) */}
+      <main className="max-w-4xl mx-auto px-4 pt-4 sm:pt-6 space-y-4">
 
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-bold text-xs sm:text-sm shadow-inner flex-shrink-0">
-              {(driver?.full_name || 'MO').slice(0, 2).toUpperCase()}
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h2 className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[220px]">
-                  {driver?.full_name || 'Motorista'}
-                </h2>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-500/10 text-green-400 border border-green-500/30">
-                  {driver?.company_type || 'PJ'}
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-400 truncate">
-                {driver?.car_model || 'Veículo'} • <span className="font-mono text-zinc-300">{driver?.car_plate || '---'}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Botão de Sair Ajustado no Topo Direito */}
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/50 hover:bg-red-500/10 text-xs font-semibold text-zinc-300 hover:text-red-400 transition-all shadow-sm active:scale-95 flex-shrink-0"
-              title="Sair da Conta"
-            >
-              <LogOut className="w-3.5 h-3.5 text-red-400" />
-              <span>Sair</span>
-            </button>
-          )}
-
-        </div>
-      </section>
-
-      {/* Main Content Area */}
-      <main className="max-w-4xl mx-auto px-4 pt-4 sm:pt-6 space-y-5">
-
-        {/* MAPA REAL LEAFLET COM RADAR E GPS (Altura Expandida) */}
+        {/* MAPA REAL LEAFLET COM RADAR, GPS E ROTA DA CHAMADA (Altura Expandida) */}
         <div className="space-y-2">
           <RealMap 
             center={[driverCoords.lat, driverCoords.lng]}
             driverCoords={driverCoords}
             isOnline={isOnline}
+            originCoords={incomingRide?.origin_coords}
+            destCoords={incomingRide?.dest_coords}
+            routeCoordinates={incomingRouteCoords}
             zoom={14}
-            height="380px"
+            height="450px"
           />
 
           <div className="flex items-center justify-between text-[11px] text-zinc-400 px-1">

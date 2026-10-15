@@ -146,6 +146,8 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenSupabaseConfig={() => setIsSupabaseModalOpen(true)}
+        isDriverOnline={isDriverOnline}
+        onToggleDriverOnline={() => handleToggleDriverOnline(!isDriverOnline)}
       />
 
       {/* Main Pages Router */}

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import RideContractModal from '../components/RideContractModal';
 import RealMap from '../components/RealMap';
-import { updateRideStatus, apiCreateContract, apiDepositPix, subscribeToRide } from '../services/supabase';
+import { updateRideStatus, apiCreateContract, apiDepositPix, subscribeToRide, apiGetDriverProfile } from '../services/supabase';
 
 export default function RideInProgress({ 
   currentRide, 
@@ -52,6 +52,23 @@ export default function RideInProgress({
     date: new Date().toISOString()
   };
 
+  // Cache de motorista aceito recentemente
+  let cachedDriver = null;
+  try {
+    const raw = localStorage.getItem('xds_last_accepted_driver');
+    if (raw) cachedDriver = JSON.parse(raw);
+  } catch (e) {}
+
+  const [liveDriverProfile, setLiveDriverProfile] = useState(null);
+
+  useEffect(() => {
+    if (!isDriver && currentRide?.driver_id && !currentRide?.driver_name) {
+      apiGetDriverProfile(currentRide.driver_id).then(prof => {
+        if (prof) setLiveDriverProfile(prof);
+      }).catch(() => {});
+    }
+  }, [isDriver, currentRide?.driver_id, currentRide?.driver_name]);
+
   // Resolução segura dos dados do Motorista
   const activeDriver = isDriver ? (driver || {
     full_name: 'Motorista Credenciado',
@@ -62,13 +79,13 @@ export default function RideInProgress({
     razao_social: 'Motorista PJ',
     cnpj: '00.000.000/0001-00'
   }) : {
-    full_name: currentRide?.driver_name || 'Motorista Particular',
-    car_model: currentRide?.driver_car || 'Veículo Particular',
-    car_plate: currentRide?.driver_plate || 'Placa Particular',
-    phone: currentRide?.driver_phone || '',
+    full_name: currentRide?.driver_name || liveDriverProfile?.full_name || cachedDriver?.driver_name || cachedDriver?.name || 'Motorista Confirmado',
+    car_model: currentRide?.driver_car || liveDriverProfile?.car_model || cachedDriver?.driver_car || cachedDriver?.car || 'Veículo do Motorista',
+    car_plate: currentRide?.driver_plate || liveDriverProfile?.car_plate || cachedDriver?.driver_plate || cachedDriver?.plate || 'Placa do Veículo',
+    phone: currentRide?.driver_phone || liveDriverProfile?.phone || cachedDriver?.driver_phone || cachedDriver?.phone || '',
     company_type: 'PJ',
-    razao_social: currentRide?.company_name || 'Transporte Individual Privado',
-    cnpj: currentRide?.cnpj || '00.000.000/0001-00'
+    razao_social: currentRide?.company_name || liveDriverProfile?.razao_social || cachedDriver?.razao_social || 'Motorista PJ',
+    cnpj: currentRide?.cnpj || liveDriverProfile?.cnpj || cachedDriver?.cnpj || '00.000.000/0001-00'
   };
 
   const passengerName = currentRide?.passenger_name || currentUser?.name || 'Mariana Albuquerque';
@@ -217,10 +234,17 @@ export default function RideInProgress({
       {/* Header com Status e Contrato Jurídico */}
       <div className="flex items-center justify-between pt-2">
         <div>
-          <span className="text-[11px] font-bold text-green-400 uppercase tracking-wider flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            {isFinished ? 'Viagem Finalizada' : 'Corrida Particular em Andamento'}
-          </span>
+          {isFinished ? (
+            <span className="text-[11px] font-bold text-green-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              Viagem Finalizada
+            </span>
+          ) : isDriver ? (
+            <span className="text-[11px] font-bold text-green-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Corrida em Andamento
+            </span>
+          ) : null}
           <h1 className="text-xl sm:text-2xl font-bold text-white mt-0.5">
             {isFinished 
               ? 'Destino Alcançado'
@@ -340,13 +364,8 @@ export default function RideInProgress({
                 {activeDriver.full_name.slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-white text-base">{activeDriver.full_name}</h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-green-500/10 text-green-400 border border-green-500/30 font-bold">
-                    PJ Credenciado
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400">
+                <h3 className="font-bold text-white text-base">{activeDriver.full_name}</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
                   {activeDriver.car_model} • Placa <strong className="text-white font-mono">{activeDriver.car_plate}</strong>
                 </p>
               </div>
@@ -406,26 +425,28 @@ export default function RideInProgress({
           </div>
         </div>
 
-        {/* GPS Navigation Links (Acesso fácil para ambos) */}
-        <div className="pt-2 border-t border-zinc-800/80 flex gap-3">
-          <button
-            onClick={handleOpenGoogleMaps}
-            className="flex-1 py-3 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-white flex items-center justify-center gap-2 transition-colors"
-          >
-            <Navigation className="w-4 h-4 text-blue-400" />
-            Navegar via Google Maps
-            <ExternalLink className="w-3 h-3 text-zinc-500" />
-          </button>
+        {/* GPS Navigation Links (Apenas para o Motorista) */}
+        {isDriver && (
+          <div className="pt-2 border-t border-zinc-800/80 flex gap-3">
+            <button
+              onClick={handleOpenGoogleMaps}
+              className="flex-1 py-3 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-white flex items-center justify-center gap-2 transition-colors"
+            >
+              <Navigation className="w-4 h-4 text-blue-400" />
+              Navegar via Google Maps
+              <ExternalLink className="w-3 h-3 text-zinc-500" />
+            </button>
 
-          <button
-            onClick={handleOpenWaze}
-            className="flex-1 py-3 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-white flex items-center justify-center gap-2 transition-colors"
-          >
-            <Navigation className="w-4 h-4 text-cyan-400" />
-            Navegar via Waze
-            <ExternalLink className="w-3 h-3 text-zinc-500" />
-          </button>
-        </div>
+            <button
+              onClick={handleOpenWaze}
+              className="flex-1 py-3 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-white flex items-center justify-center gap-2 transition-colors"
+            >
+              <Navigation className="w-4 h-4 text-cyan-400" />
+              Navegar via Waze
+              <ExternalLink className="w-3 h-3 text-zinc-500" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Caixa de Finalização / Pagamento (Diferenciada por Perfil) */}

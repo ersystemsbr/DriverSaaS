@@ -277,7 +277,7 @@ export async function apiGetDriverProfile(userId) {
     const { data: driverData, error: driverErr } = await client
       .from('xds_drivers')
       .select('*, xds_users(name, email, phone)')
-      .eq('user_id', userId)
+      .or(`user_id.eq.${userId},id.eq.${userId}`)
       .maybeSingle();
 
     if (driverErr || !driverData) return null;
@@ -630,6 +630,8 @@ export const createRideRequest = async (rideData) => {
     passenger_phone: rideData.passenger_phone || '(11) 98877-6655',
     origin_address: rideData.origin_address || rideData.origin || 'Origem',
     destination_address: rideData.destination_address || rideData.destination || 'Destino',
+    origin_coords: rideData.origin_coords || null,
+    dest_coords: rideData.dest_coords || null,
     distance_km: parseFloat(rideData.distance_km || 8.5),
     duration_min: parseInt(rideData.duration_min || 20, 10),
     total_price: parseFloat(rideData.total_price || 35.00),
@@ -846,6 +848,12 @@ export const updateRideStatus = async (rideId, status, extraData = {}) => {
     } catch (e) {
       console.error('updateRideStatus Supabase Error:', e);
     }
+  }
+
+  if (extraData && typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('xds_last_accepted_driver', JSON.stringify(extraData));
+    } catch (e) {}
   }
 
   if (localChannel) {

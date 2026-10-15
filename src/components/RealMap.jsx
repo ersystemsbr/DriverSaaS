@@ -72,40 +72,40 @@ export default function RealMap({
       L.marker([lat, lng], { icon: carIcon }).addTo(layerGroup);
     }
 
-    // 2. Marcador de Ponto de Embarque (Origem)
+    // 2. Marcador de Ponto de Embarque (Parada)
     if (originCoords && originCoords.lat && originCoords.lng) {
       const originIcon = L.divIcon({
         html: `
-          <div style="background: #22c55e; color: #000; width: 30px; height: 30px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; border: 2.5px solid #fff; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.6);">
-            A
+          <div style="background: #22c55e; color: #000; width: 32px; height: 32px; border-radius: 9999px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; font-size: 11px; border: 2.5px solid #fff; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.7);">
+            <span>1</span>
           </div>
         `,
         className: 'origin-marker',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
 
       L.marker([originCoords.lat, originCoords.lng], { icon: originIcon })
         .addTo(layerGroup)
-        .bindPopup('Ponto de Embarque');
+        .bindPopup('<b>Parada 1: Embarque do Passageiro</b>');
     }
 
-    // 3. Marcador de Destino
+    // 3. Marcador de Destino Final
     if (destCoords && destCoords.lat && destCoords.lng) {
       const destIcon = L.divIcon({
         html: `
-          <div style="background: #3b82f6; color: #fff; width: 30px; height: 30px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; border: 2.5px solid #fff; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);">
-            B
+          <div style="background: #3b82f6; color: #fff; width: 32px; height: 32px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 11px; border: 2.5px solid #fff; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.7);">
+            <span>2</span>
           </div>
         `,
         className: 'dest-marker',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
 
       L.marker([destCoords.lat, destCoords.lng], { icon: destIcon })
         .addTo(layerGroup)
-        .bindPopup('Destino Final');
+        .bindPopup('<b>Destino Final da Corrida</b>');
     }
 
     // 4. Polilinha da Rota Real e Enquadramento de Câmera
@@ -129,6 +129,17 @@ export default function RealMap({
 
       try {
         map.fitBounds(polyline.getBounds(), { padding: [45, 45], maxZoom: 16 });
+      } catch (e) {}
+    } else if (driverCoords && originCoords && destCoords && originCoords.lat && destCoords.lat) {
+      try {
+        const dLat = driverCoords.lat || driverCoords[0];
+        const dLng = driverCoords.lng || driverCoords[1];
+        const bounds = L.latLngBounds([
+          [dLat, dLng],
+          [originCoords.lat, originCoords.lng],
+          [destCoords.lat, destCoords.lng]
+        ]);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       } catch (e) {}
     } else if (originCoords && destCoords && originCoords.lat && destCoords.lat) {
       try {

@@ -10,7 +10,9 @@ export default function Navbar({
   driver, 
   currentUser, 
   onLogout,
-  onOpenSupabaseConfig
+  onOpenSupabaseConfig,
+  isDriverOnline,
+  onToggleDriverOnline
 }) {
   const [isSecretOpen, setIsSecretOpen] = useState(false);
   const [adminPin, setAdminPin] = useState('');
@@ -70,32 +72,36 @@ export default function Navbar({
         </div>
 
         {/* Right Action Items */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           
-          {/* Status de Conexão: Simples 'Conectado' ou 'Desconectado' para motorista e passageiro; detalhes apenas para admin */}
-          {currentRole === 'admin' ? (
-            onOpenSupabaseConfig && (
-              <button
-                onClick={onOpenSupabaseConfig}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 text-[11px] text-zinc-300 transition-colors"
-                title="Status & Configuração Supabase (Admin)"
-              >
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'}`} />
-                <span className="font-mono text-[10px] text-emerald-400 font-bold">
-                  {isConnected ? 'Supabase OK' : 'Supabase Off'}
-                </span>
-              </button>
-            )
-          ) : (
-            <div 
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800/80 text-[11px] select-none"
-              title={isConnected ? 'Conectado ao servidor' : 'Desconectado'}
+          {/* Botão Online/Offline no Topo no lugar do Conectado (apenas para Motorista) */}
+          {currentUser && currentRole === 'driver' && (
+            <button
+              onClick={onToggleDriverOnline}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md flex-shrink-0 active:scale-95 ${
+                isDriverOnline
+                  ? 'bg-green-500 text-black shadow-green-500/25 hover:bg-green-400'
+                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
+              }`}
+              title={isDriverOnline ? 'Clique para ficar Offline' : 'Clique para ficar Online'}
             >
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
-              <span className={`text-[11px] font-medium ${isConnected ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                {isConnected ? 'Conectado' : 'Desconectado'}
+              <span className={`w-2 h-2 rounded-full ${isDriverOnline ? 'bg-black animate-pulse' : 'bg-zinc-600'}`} />
+              <span>{isDriverOnline ? 'Online' : 'Offline'}</span>
+            </button>
+          )}
+
+          {/* Admin diagnostic status */}
+          {currentRole === 'admin' && onOpenSupabaseConfig && (
+            <button
+              onClick={onOpenSupabaseConfig}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 text-[11px] text-zinc-300 transition-colors"
+              title="Status & Configuração Supabase (Admin)"
+            >
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'}`} />
+              <span className="font-mono text-[10px] text-emerald-400 font-bold">
+                {isConnected ? 'Supabase OK' : 'Supabase Off'}
               </span>
-            </div>
+            </button>
           )}
           
           {/* Se logado como Admin: badge explicativo */}
