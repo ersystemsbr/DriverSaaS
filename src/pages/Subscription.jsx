@@ -25,27 +25,30 @@ export default function Subscription({ driver, setDriver, plans, setActivePage }
 
     const newExpiration = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 
-    setDriver(prev => ({
-      ...prev,
-      subscription_status: 'active',
-      current_plan: selectedPlan.id,
-      subscription_expires_at: newExpiration,
-      wallet: {
-        ...prev.wallet,
-        transactions: [
-          {
-            id: `tx_${Date.now().toString().slice(-4)}`,
-            type: 'debit_plan',
-            title: `Assinatura DriverSaaS - Plano ${selectedPlan.name}`,
-            amount: -selectedPlan.price,
-            date: new Date().toISOString(),
-            status: 'completed',
-            method: 'Pix Direto'
-          },
-          ...prev.wallet.transactions
-        ]
-      }
-    }));
+    setDriver(prev => {
+      const prevWallet = prev?.wallet || { available_balance: 0, pending_balance: 0, pix_keys: [], transactions: [] };
+      return {
+        ...prev,
+        subscription_status: 'active',
+        current_plan: selectedPlan.id,
+        subscription_expires_at: newExpiration,
+        wallet: {
+          ...prevWallet,
+          transactions: [
+            {
+              id: `tx_${Date.now().toString().slice(-4)}`,
+              type: 'debit_plan',
+              title: `Assinatura DriverSaaS - Plano ${selectedPlan.name}`,
+              amount: -selectedPlan.price,
+              date: new Date().toISOString(),
+              status: 'completed',
+              method: 'Pix Direto'
+            },
+            ...(prevWallet.transactions || [])
+          ]
+        }
+      };
+    });
 
     setIsPixModalOpen(false);
     setSelectedPlan(null);

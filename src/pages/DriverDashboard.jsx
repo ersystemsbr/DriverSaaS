@@ -155,19 +155,19 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
           
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-bold text-lg shadow-inner">
-              {driver.full_name.slice(0, 2).toUpperCase()}
+              {(driver?.full_name || 'MO').slice(0, 2).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white leading-tight">{driver.full_name}</h2>
+                <h2 className="text-base font-bold text-white leading-tight">{driver?.full_name || 'Motorista'}</h2>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/30">
-                  {driver.company_type} • CNPJ Ativo
+                  {driver?.company_type || 'PJ'} • CNPJ Ativo
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
-                <span>{driver.car_model}</span>
+                <span>{driver?.car_model || 'Veículo'}</span>
                 <span>•</span>
-                <span className="font-mono font-semibold text-zinc-300">{driver.car_plate}</span>
+                <span className="font-mono font-semibold text-zinc-300">{driver?.car_plate || '---'}</span>
               </p>
             </div>
           </div>
@@ -320,10 +320,10 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
               Conta Digital DriverSaaS
             </span>
             <div className="text-3xl font-black text-white">
-              R$ {driver.wallet.available_balance.toFixed(2)}
+              R$ {(driver?.wallet?.available_balance ?? driver?.wallet_balance ?? 0).toFixed(2)}
             </div>
             <p className="text-xs text-zinc-400">
-              Chave Pix Ativa: <span className="font-mono text-zinc-300">{driver.cnpj}</span> (CNPJ da empresa)
+              Chave Pix Ativa: <span className="font-mono text-zinc-300">{driver?.cnpj || 'Não informada'}</span> (CNPJ da empresa)
             </p>
           </div>
 

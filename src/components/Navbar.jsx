@@ -69,7 +69,7 @@ export default function Navbar({
               <Wallet className="w-4 h-4 text-green-400" />
               <span className="hidden sm:inline text-zinc-400">Saldo:</span>
               <span className="font-bold text-green-400">
-                R$ {driver.wallet.available_balance.toFixed(2)}
+                R$ {(driver?.wallet?.available_balance ?? driver?.wallet_balance ?? 0).toFixed(2)}
               </span>
             </button>
           )}

@@ -69,29 +69,32 @@ export default function RideInProgress({ currentRide, driver, setDriver, setRide
     };
 
     // Credit full amount (100% driver revenue, 0% commission)
-    setDriver(prev => ({
-      ...prev,
-      today_rides: prev.today_rides + 1,
-      today_earnings: prev.today_earnings + completedRide.total_price,
-      total_rides: prev.total_rides + 1,
-      total_earnings: prev.total_earnings + completedRide.total_price,
-      wallet: {
-        ...prev.wallet,
-        available_balance: prev.wallet.available_balance + completedRide.total_price,
-        transactions: [
-          {
-            id: `tx_${Date.now().toString().slice(-4)}`,
-            type: 'credit_ride',
-            title: `Recebimento Corrida #${contractNum} (${completedRide.passenger_name})`,
-            amount: completedRide.total_price,
-            date: new Date().toISOString(),
-            status: 'completed',
-            method: paymentMethod
-          },
-          ...prev.wallet.transactions
-        ]
-      }
-    }));
+    setDriver(prev => {
+      const prevWallet = prev?.wallet || { available_balance: 0, pending_balance: 0, pix_keys: [], transactions: [] };
+      return {
+        ...prev,
+        today_rides: (prev?.today_rides || 0) + 1,
+        today_earnings: (prev?.today_earnings || 0) + completedRide.total_price,
+        total_rides: (prev?.total_rides || 0) + 1,
+        total_earnings: (prev?.total_earnings || 0) + completedRide.total_price,
+        wallet: {
+          ...prevWallet,
+          available_balance: (prevWallet.available_balance || 0) + completedRide.total_price,
+          transactions: [
+            {
+              id: `tx_${Date.now().toString().slice(-4)}`,
+              type: 'credit_ride',
+              title: `Recebimento Corrida #${contractNum} (${completedRide.passenger_name})`,
+              amount: completedRide.total_price,
+              date: new Date().toISOString(),
+              status: 'completed',
+              method: paymentMethod
+            },
+            ...(prevWallet.transactions || [])
+          ]
+        }
+      };
+    });
 
     setRidesHistory(prev => [completedRide, ...prev]);
     setIsFinished(true);

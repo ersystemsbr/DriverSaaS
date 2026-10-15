@@ -26,7 +26,8 @@ export default function Wallet({ driver, setDriver }) {
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
   const [isKeysModalOpen, setIsKeysModalOpen] = useState(false);
 
-  const transactions = driver.wallet.transactions || [];
+  const wallet = driver?.wallet || { available_balance: 0, pending_balance: 0, pix_keys: [], transactions: [] };
+  const transactions = wallet.transactions || [];
 
   const filteredTransactions = transactions.filter(tx => {
     if (filterType === 'in') return tx.amount > 0;
@@ -38,25 +39,28 @@ export default function Wallet({ driver, setDriver }) {
     const val = parseFloat(depositAmount);
     if (isNaN(val) || val <= 0) return;
 
-    setDriver(prev => ({
-      ...prev,
-      wallet: {
-        ...prev.wallet,
-        available_balance: prev.wallet.available_balance + val,
-        transactions: [
-          {
-            id: `tx_${Date.now().toString().slice(-4)}`,
-            type: 'deposit_pix',
-            title: 'Depósito via Pix Recebido',
-            amount: val,
-            date: new Date().toISOString(),
-            status: 'completed',
-            method: 'Pix In'
-          },
-          ...prev.wallet.transactions
-        ]
-      }
-    }));
+    setDriver(prev => {
+      const prevWallet = prev?.wallet || { available_balance: 0, pending_balance: 0, pix_keys: [], transactions: [] };
+      return {
+        ...prev,
+        wallet: {
+          ...prevWallet,
+          available_balance: (prevWallet.available_balance || 0) + val,
+          transactions: [
+            {
+              id: `tx_${Date.now().toString().slice(-4)}`,
+              type: 'deposit_pix',
+              title: 'Depósito via Pix Recebido',
+              amount: val,
+              date: new Date().toISOString(),
+              status: 'completed',
+              method: 'Pix In'
+            },
+            ...(prevWallet.transactions || [])
+          ]
+        }
+      };
+    });
 
     setIsDepositModalOpen(false);
   };
@@ -64,30 +68,34 @@ export default function Wallet({ driver, setDriver }) {
   const handleWithdraw = (e) => {
     e.preventDefault();
     const val = parseFloat(withdrawAmount);
-    if (isNaN(val) || val <= 0 || val > driver.wallet.available_balance) {
+    const available = driver?.wallet?.available_balance ?? 0;
+    if (isNaN(val) || val <= 0 || val > available) {
       alert('Valor de saque inválido ou saldo insuficiente.');
       return;
     }
 
-    setDriver(prev => ({
-      ...prev,
-      wallet: {
-        ...prev.wallet,
-        available_balance: prev.wallet.available_balance - val,
-        transactions: [
-          {
-            id: `tx_${Date.now().toString().slice(-4)}`,
-            type: 'transfer_out',
-            title: `Saque Pix para chave ${withdrawKey || 'padrão'}`,
-            amount: -val,
-            date: new Date().toISOString(),
-            status: 'completed',
-            method: 'Pix Out (Instantâneo)'
-          },
-          ...prev.wallet.transactions
-        ]
-      }
-    }));
+    setDriver(prev => {
+      const prevWallet = prev?.wallet || { available_balance: 0, pending_balance: 0, pix_keys: [], transactions: [] };
+      return {
+        ...prev,
+        wallet: {
+          ...prevWallet,
+          available_balance: Math.max(0, (prevWallet.available_balance || 0) - val),
+          transactions: [
+            {
+              id: `tx_${Date.now().toString().slice(-4)}`,
+              type: 'transfer_out',
+              title: `Saque Pix para chave ${withdrawKey || 'padrão'}`,
+              amount: -val,
+              date: new Date().toISOString(),
+              status: 'completed',
+              method: 'Pix Out (Instantâneo)'
+            },
+            ...(prevWallet.transactions || [])
+          ]
+        }
+      };
+    });
 
     setWithdrawSuccess(true);
     setTimeout(() => {
@@ -133,10 +141,10 @@ export default function Wallet({ driver, setDriver }) {
             <span className="text-xs font-semibold text-zinc-400 block mb-1">Saldo Total Disponível</span>
             <div className="text-3xl sm:text-4xl font-black text-white tracking-tight flex items-baseline gap-1">
               <span className="text-lg font-bold text-green-400">R$</span>
-              <span>{driver.wallet.available_balance.toFixed(2)}</span>
+              <span>{(driver?.wallet?.available_balance ?? driver?.wallet_balance ?? 0).toFixed(2)}</span>
             </div>
             <div className="flex items-center gap-4 mt-2 text-xs text-zinc-400">
-              <span>A liberar: <strong className="text-zinc-200">R$ {driver.wallet.pending_balance?.toFixed(2) || '0.00'}</strong></span>
+              <span>A liberar: <strong className="text-zinc-200">R$ {(driver?.wallet?.pending_balance ?? 0).toFixed(2)}</strong></span>
               <span>•</span>
               <span>Rendimento: <strong className="text-green-400">100% CDI</strong></span>
             </div>
@@ -297,8 +305,8 @@ export default function Wallet({ driver, setDriver }) {
                     type="number"
                     step="0.01"
                     required
-                    max={driver.wallet.available_balance}
-                    placeholder={`Disponível: R$ ${driver.wallet.available_balance.toFixed(2)}`}
+                    max={driver?.wallet?.available_balance ?? 0}
+                    placeholder={`Disponível: R$ ${(driver?.wallet?.available_balance ?? driver?.wallet_balance ?? 0).toFixed(2)}`}
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white font-bold focus:outline-none focus:border-green-500"

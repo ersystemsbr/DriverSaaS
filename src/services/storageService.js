@@ -105,53 +105,96 @@ export function clearStoredSession() {
 // --------------------------------------------------------------------------
 export function getDriverProfile() {
   initStorage();
-  return getItem(KEYS.DRIVER_PROFILE, INITIAL_DRIVER);
+  const stored = getItem(KEYS.DRIVER_PROFILE, null);
+  if (!stored) return INITIAL_DRIVER;
+
+  // Garante que todas as propriedades obrigatórias (como wallet) existam mesmo se o cache antigo estiver incompleto
+  const walletAvailable = typeof stored.wallet?.available_balance === 'number'
+    ? stored.wallet.available_balance
+    : (typeof stored.wallet_balance === 'number' ? stored.wallet_balance : 0.00);
+
+  return {
+    ...INITIAL_DRIVER,
+    ...stored,
+    full_name: stored.full_name || stored.name || INITIAL_DRIVER.full_name,
+    car_model: stored.car_model || INITIAL_DRIVER.car_model,
+    car_plate: stored.car_plate || INITIAL_DRIVER.car_plate,
+    company_type: stored.company_type || INITIAL_DRIVER.company_type,
+    cnpj: stored.cnpj || INITIAL_DRIVER.cnpj,
+    subscription_status: stored.subscription_status || 'active',
+    wallet: {
+      available_balance: walletAvailable,
+      pending_balance: stored.wallet?.pending_balance ?? 0.00,
+      blocked_balance: stored.wallet?.blocked_balance ?? 0.00,
+      pix_keys: stored.wallet?.pix_keys && stored.wallet.pix_keys.length > 0
+        ? stored.wallet.pix_keys
+        : [
+            { type: 'CNPJ', key: stored.cnpj || INITIAL_DRIVER.cnpj, default: true },
+            { type: 'Celular', key: stored.phone || INITIAL_DRIVER.phone, default: false }
+          ],
+      transactions: stored.wallet?.transactions || []
+    }
+  };
 }
 
 export function saveDriverProfile(driverData) {
-  setItem(KEYS.DRIVER_PROFILE, driverData);
+  // Garante estrutura segura de wallet
+  const safeDriver = {
+    ...driverData,
+    wallet: {
+      available_balance: typeof driverData.wallet?.available_balance === 'number'
+        ? driverData.wallet.available_balance
+        : (typeof driverData.wallet_balance === 'number' ? driverData.wallet_balance : 0.00),
+      pending_balance: driverData.wallet?.pending_balance ?? 0.00,
+      blocked_balance: driverData.wallet?.blocked_balance ?? 0.00,
+      pix_keys: driverData.wallet?.pix_keys || [],
+      transactions: driverData.wallet?.transactions || []
+    }
+  };
+
+  setItem(KEYS.DRIVER_PROFILE, safeDriver);
 
   // Atualiza na lista de motoristas
   const drivers = getItem(KEYS.DRIVERS, []);
-  const idx = drivers.findIndex(d => d.id === driverData.id || d.email === driverData.email);
+  const idx = drivers.findIndex(d => d.id === safeDriver.id || d.email === safeDriver.email);
   if (idx >= 0) {
-    drivers[idx] = { ...drivers[idx], ...driverData };
+    drivers[idx] = { ...drivers[idx], ...safeDriver };
   } else {
-    drivers.push(driverData);
+    drivers.push(safeDriver);
   }
   setItem(KEYS.DRIVERS, drivers);
 
   // Atualiza na lista do Admin também
   const adminDrivers = getItem(KEYS.ADMIN_DRIVERS, INITIAL_ALL_DRIVERS_ADMIN);
-  const adminIdx = adminDrivers.findIndex(d => d.id === driverData.id || d.name === driverData.full_name);
+  const adminIdx = adminDrivers.findIndex(d => d.id === safeDriver.id || d.name === safeDriver.full_name);
   if (adminIdx >= 0) {
     adminDrivers[adminIdx] = {
       ...adminDrivers[adminIdx],
-      name: driverData.full_name,
-      company: driverData.razao_social || driverData.nome_fantasia || adminDrivers[adminIdx].company,
-      company_type: driverData.company_type || adminDrivers[adminIdx].company_type,
-      cnpj: driverData.cnpj || adminDrivers[adminIdx].cnpj,
-      car: `${driverData.car_model || ''} (${driverData.car_plate || ''})`
+      name: safeDriver.full_name,
+      company: safeDriver.razao_social || safeDriver.nome_fantasia || adminDrivers[adminIdx].company,
+      company_type: safeDriver.company_type || adminDrivers[adminIdx].company_type,
+      cnpj: safeDriver.cnpj || adminDrivers[adminIdx].cnpj,
+      car: `${safeDriver.car_model || ''} (${safeDriver.car_plate || ''})`
     };
     setItem(KEYS.ADMIN_DRIVERS, adminDrivers);
   }
 
   // Se Supabase estiver conectado, atualiza na nuvem
-  if (isSupabaseConfigured && supabase && driverData.id) {
+  if (isSupabaseConfigured && supabase && safeDriver.id) {
     supabase.from('xds_drivers').upsert({
-      id: driverData.id,
-      company_type: driverData.company_type,
-      cnpj: driverData.cnpj,
-      razao_social: driverData.razao_social,
-      nome_fantasia: driverData.nome_fantasia,
-      inscricao_municipal: driverData.inscricao_municipal,
-      car_model: driverData.car_model,
-      car_plate: driverData.car_plate,
-      car_color: driverData.car_color,
-      car_year: driverData.car_year,
-      base_price: driverData.base_price,
-      price_per_km: driverData.price_per_km,
-      is_online: driverData.is_online,
+      id: safeDriver.id,
+      company_type: safeDriver.company_type,
+      cnpj: safeDriver.cnpj,
+      razao_social: safeDriver.razao_social,
+      nome_fantasia: safeDriver.nome_fantasia,
+      inscricao_municipal: safeDriver.inscricao_municipal,
+      car_model: safeDriver.car_model,
+      car_plate: safeDriver.car_plate,
+      car_color: safeDriver.car_color,
+      car_year: safeDriver.car_year,
+      base_price: safeDriver.base_price,
+      price_per_km: safeDriver.price_per_km,
+      is_online: safeDriver.is_online,
       updated_at: new Date().toISOString()
     }).catch(err => console.warn('Supabase driver upsert:', err));
   }
@@ -178,6 +221,7 @@ export async function registerDriverUser(formData) {
   };
 
   const newDriver = {
+    ...INITIAL_DRIVER,
     id: driverId,
     user_id: userId,
     full_name: formData.full_name,
@@ -203,7 +247,26 @@ export async function registerDriverUser(formData) {
     total_earnings: 0.0,
     today_rides: 0,
     today_earnings: 0.0,
-    wallet_balance: 0.0,
+    wallet: {
+      available_balance: 0.00,
+      pending_balance: 0.00,
+      blocked_balance: 0.00,
+      pix_keys: [
+        { type: 'CNPJ', key: formData.cnpj || '', default: true },
+        { type: 'Celular', key: formData.phone || '', default: false }
+      ],
+      transactions: [
+        {
+          id: `tx_${Date.now()}`,
+          type: "bonus_welcome",
+          title: "Abertura de Conta Digital DriverSaaS",
+          amount: 0.00,
+          date: new Date().toISOString(),
+          status: "completed",
+          method: "BaaS Digital"
+        }
+      ]
+    },
     created_at: new Date().toISOString()
   };
 
@@ -422,8 +485,11 @@ export async function authenticateUser(emailOrPhone, password, role) {
   let driverProfile = null;
   if (role === 'driver') {
     const drivers = getItem(KEYS.DRIVERS, []);
-    driverProfile = drivers.find(d => d.user_id === foundUser.id || d.email === foundUser.email) || getDriverProfile();
-    setItem(KEYS.DRIVER_PROFILE, driverProfile);
+    const rawDriver = drivers.find(d => d.user_id === foundUser.id || d.email === foundUser.email);
+    if (rawDriver) {
+      saveDriverProfile(rawDriver);
+    }
+    driverProfile = getDriverProfile();
   }
 
   return { success: true, user: sessionUser, driver: driverProfile };
