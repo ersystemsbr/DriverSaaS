@@ -265,11 +265,13 @@ export default function App() {
         />
       )}
 
-      {/* Modal de Conexão e Diagnóstico do Supabase */}
-      <SupabaseConfigModal
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
-      />
+      {/* Modal de Conexão e Diagnóstico do Supabase (Apenas Acesso Admin) */}
+      {currentRole === 'admin' && (
+        <SupabaseConfigModal
+          isOpen={isSupabaseModalOpen}
+          onClose={() => setIsSupabaseModalOpen(false)}
+        />
+      )}
 
     </div>
   );

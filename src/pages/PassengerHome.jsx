@@ -305,42 +305,15 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
   return (
     <div className="min-h-screen bg-[#09090b] text-white p-4 sm:p-6 pb-24 max-w-2xl mx-auto space-y-6">
       
-      {/* Title */}
-      <div className="pt-2">
-        <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-          <UserCheck className="w-4 h-4" />
-          Área do Passageiro • Transporte Particular Seguro
-        </span>
-        <h1 className="text-2xl font-bold text-white mt-0.5">
-          Para onde você vai hoje?
-        </h1>
-        <p className="text-xs text-zinc-400">
-          Chame seu motorista de confiança com rota em tempo real, contrato PJ e sem taxas de intermediação.
-        </p>
-      </div>
-
-      {/* MAPA REAL LEAFLET COM ROTA */}
-      <div className="relative">
-        <RealMap
-          center={[originCoords?.lat || deviceCoords.lat, originCoords?.lng || deviceCoords.lng]}
-          zoom={13}
-          originCoords={originCoords}
-          destCoords={destCoords}
-          routeCoordinates={routeData?.coordinates}
-          height="280px"
-        />
-
-        <button
-          onClick={handleUseCurrentGPS}
-          className="absolute top-3 right-3 z-20 px-3 py-1.5 bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs font-semibold text-green-400 flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all active:scale-95"
-        >
-          <Navigation className="w-3.5 h-3.5" />
-          Usar Meu GPS
-        </button>
-      </div>
-
-      {/* Inputs com Busca Real e Resposta Imediata no Mapa */}
+      {/* Inputs com Busca Real e Resposta Imediata no Mapa (Acima do Mapa) */}
       <div className="p-5 rounded-3xl bg-zinc-950 border border-zinc-800 shadow-xl space-y-4">
+        
+        {/* Título do Card de Endereços */}
+        <div className="pb-1">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+            Para onde você vai hoje?
+          </h1>
+        </div>
         
         <div className="space-y-4 relative">
           
@@ -533,6 +506,26 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
           </div>
         </div>
 
+      </div>
+
+      {/* MAPA REAL LEAFLET COM ROTA (Abaixo do Card de Endereços) */}
+      <div className="relative">
+        <RealMap
+          center={[originCoords?.lat || deviceCoords.lat, originCoords?.lng || deviceCoords.lng]}
+          zoom={13}
+          originCoords={originCoords}
+          destCoords={destCoords}
+          routeCoordinates={routeData?.coordinates}
+          height="280px"
+        />
+
+        <button
+          onClick={handleUseCurrentGPS}
+          className="absolute top-3 right-3 z-20 px-3 py-1.5 bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs font-semibold text-green-400 flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all active:scale-95"
+        >
+          <Navigation className="w-3.5 h-3.5" />
+          Usar Meu GPS
+        </button>
       </div>
 
       {/* Cascata de Motoristas Favoritos */}

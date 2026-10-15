@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, Car, User, Settings, Wallet, LogOut, LogIn, KeyRound, Database } from 'lucide-react';
+import { testSupabaseConnection, isSupabaseConfigured } from '../services/supabase';
 
 export default function Navbar({ 
   currentRole, 
@@ -14,6 +15,17 @@ export default function Navbar({
   const [isSecretOpen, setIsSecretOpen] = useState(false);
   const [adminPin, setAdminPin] = useState('');
   const [adminError, setAdminError] = useState('');
+  const [isConnected, setIsConnected] = useState(isSupabaseConfigured);
+
+  useEffect(() => {
+    let mounted = true;
+    testSupabaseConnection().then(res => {
+      if (mounted) {
+        setIsConnected(Boolean(res?.success));
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const handleAdminAccess = (e) => {
     e.preventDefault();
@@ -53,16 +65,30 @@ export default function Navbar({
         {/* Right Action Items */}
         <div className="flex items-center gap-3">
           
-          {/* Supabase Status / Config Button */}
-          {onOpenSupabaseConfig && (
-            <button
-              onClick={onOpenSupabaseConfig}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 text-[11px] text-zinc-300 transition-colors"
-              title="Status do Banco Supabase"
+          {/* Status de Conexão: Simples 'Conectado' ou 'Desconectado' para motorista e passageiro; detalhes apenas para admin */}
+          {currentRole === 'admin' ? (
+            onOpenSupabaseConfig && (
+              <button
+                onClick={onOpenSupabaseConfig}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 text-[11px] text-zinc-300 transition-colors"
+                title="Status & Configuração Supabase (Admin)"
+              >
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'}`} />
+                <span className="font-mono text-[10px] text-emerald-400 font-bold">
+                  {isConnected ? 'Supabase OK' : 'Supabase Off'}
+                </span>
+              </button>
+            )
+          ) : (
+            <div 
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800/80 text-[11px] select-none"
+              title={isConnected ? 'Conectado ao servidor' : 'Desconectado'}
             >
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="hidden sm:inline font-mono text-[10px] text-emerald-400 font-bold">Supabase</span>
-            </button>
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+              <span className={`text-[11px] font-medium ${isConnected ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                {isConnected ? 'Conectado' : 'Desconectado'}
+              </span>
+            </div>
           )}
           
           {/* Se logado como motorista: mostra o saldo */}
