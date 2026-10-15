@@ -17,7 +17,7 @@ import {
   Compass
 } from 'lucide-react';
 import RealMap from '../components/RealMap';
-import { getDeviceLocation, searchAddressNominatim, calculateRealRoute, geocodeAddress } from '../services/mapService';
+import { getDeviceLocation, searchAddressNominatim, calculateRealRoute, geocodeAddress, reverseGeocode } from '../services/mapService';
 import { createRideRequest, apiGetFavoriteDrivers, subscribeToRide, updateRideStatus, apiGetDriverProfile } from '../services/supabase';
 
 export default function PassengerHome({ driver, setActivePage, setCurrentRide, currentUser }) {
@@ -52,13 +52,14 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
   const [countdown, setCountdown] = useState(30);
   const [callSuccess, setCallSuccess] = useState(false);
 
-  // 1. Obter GPS real do passageiro no carregamento imediato
+  // 1. Obter GPS real do passageiro no carregamento imediato e resolver endereço
   useEffect(() => {
-    getDeviceLocation().then((coords) => {
+    getDeviceLocation().then(async (coords) => {
       if (coords) {
         setDeviceCoords(coords);
         setOriginCoords(coords);
-        setOrigin('Minha Localização Atual (GPS)');
+        const addr = await reverseGeocode(coords);
+        setOrigin(addr || 'Minha Localização Atual (GPS)');
       }
     });
   }, []);
@@ -248,12 +249,13 @@ export default function PassengerHome({ driver, setActivePage, setCurrentRide, c
     }
   };
 
-  // Usar GPS atual como origem
+  // Usar GPS atual como origem com resolução de endereço
   const handleUseCurrentGPS = async () => {
     const coords = await getDeviceLocation();
     setDeviceCoords(coords);
     setOriginCoords(coords);
-    setOrigin('Minha Localização Atual (GPS)');
+    const addr = await reverseGeocode(coords);
+    setOrigin(addr || 'Minha Localização Atual (GPS)');
     setOriginSuggestions([]);
   };
 

@@ -14,7 +14,30 @@ export default async function handler(req, res) {
     return;
   }
 
-  const query = req.query?.q || (req.url ? new URL(req.url, 'http://localhost').searchParams.get('q') : '');
+  const urlObj = req.url ? new URL(req.url, 'http://localhost') : null;
+  const lat = req.query?.lat || urlObj?.searchParams.get('lat');
+  const lon = req.query?.lon || urlObj?.searchParams.get('lon');
+  const query = req.query?.q || urlObj?.searchParams.get('q') || '';
+
+  // 1. Geocodificação Reversa (coordenadas para endereço real)
+  if (lat && lon) {
+    try {
+      const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&addressdetails=1&email=suporte@driversaas.app`;
+      const revRes = await fetch(revUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://driversaas.vercel.app'
+        }
+      });
+      if (revRes.ok) {
+        const revData = await revRes.json();
+        return res.status(200).json(revData || {});
+      }
+      return res.status(200).json({});
+    } catch (e) {
+      return res.status(200).json({});
+    }
+  }
 
   if (!query || query.trim().length < 2) {
     return res.status(200).json([]);

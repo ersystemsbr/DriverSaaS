@@ -98,20 +98,6 @@ export default function Navbar({
             </div>
           )}
           
-          {/* Se logado como motorista: mostra o saldo */}
-          {currentUser && currentRole === 'driver' && (
-            <button
-              onClick={() => setActivePage('wallet')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-green-500/40 text-xs font-medium text-white transition-colors"
-            >
-              <Wallet className="w-4 h-4 text-green-400" />
-              <span className="hidden sm:inline text-zinc-400">Saldo:</span>
-              <span className="font-bold text-green-400">
-                R$ {(driver?.wallet?.available_balance ?? driver?.wallet_balance ?? 0).toFixed(2)}
-              </span>
-            </button>
-          )}
-
           {/* Se logado como Admin: badge explicativo */}
           {currentUser && currentRole === 'admin' && (
             <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5">
@@ -124,7 +110,7 @@ export default function Navbar({
           {currentUser ? (
             <button
               onClick={onLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/40 text-xs text-zinc-300 hover:text-red-400 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/50 hover:bg-red-500/10 text-xs font-semibold text-zinc-300 hover:text-red-400 transition-all shadow-sm active:scale-95"
               title="Sair da Conta"
             >
               <LogOut className="w-3.5 h-3.5 text-red-400" />

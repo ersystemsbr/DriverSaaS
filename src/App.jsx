@@ -191,6 +191,7 @@ export default function App() {
             setCurrentRide={setCurrentRide}
             isOnline={isDriverOnline}
             setIsOnline={handleToggleDriverOnline}
+            onLogout={handleLogout}
           />
         )}
 

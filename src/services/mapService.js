@@ -97,13 +97,37 @@ export const geocodeAddress = async (query) => {
   return results.length > 0 ? results[0] : null;
 };
 
-const formatShortAddress = (item) => {
+export const formatShortAddress = (item) => {
+  if (!item) return '';
   const addr = item.address || {};
   const road = addr.road || addr.pedestrian || addr.suburb || item.name || '';
   const house = addr.house_number ? `, ${addr.house_number}` : '';
+  const suburb = addr.suburb && addr.suburb !== road ? ` - ${addr.suburb}` : '';
   const city = addr.city || addr.town || addr.municipality || 'São Paulo';
-  const state = addr.state ? ` - ${addr.state}` : '';
-  return `${road}${house}${road ? ' - ' : ''}${city}${state}` || item.display_name;
+  if (road) {
+    return `${road}${house}${suburb}, ${city}`;
+  }
+  return item.display_name?.split(',').slice(0, 3).join(',') || item.display_name || 'Endereço detectado';
+};
+
+// 2.1 Geocodificação Reversa (coordenadas para nome da rua)
+export const reverseGeocode = async (coords) => {
+  if (!coords || typeof coords.lat !== 'number' || typeof coords.lng !== 'number') return null;
+  try {
+    let res = await fetch(`/api/geocode?lat=${coords.lat}&lon=${coords.lng}`);
+    if (!res.ok) {
+      res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&addressdetails=1&email=suporte@driversaas.app`);
+    }
+    if (res.ok) {
+      const data = await res.json();
+      if (data && (data.display_name || data.address)) {
+        return formatShortAddress(data);
+      }
+    }
+  } catch (err) {
+    console.warn('Erro na geocodificação reversa:', err);
+  }
+  return null;
 };
 
 // 3. Cálculo de rota real, distância por ruas e polilinha no mapa (OSRM - Open Source Routing Machine)

@@ -10,6 +10,33 @@ export default defineConfig({
         server.middlewares.use('/api/geocode', async (req, res) => {
           const url = new URL(req.url, 'http://localhost:3000');
           const q = url.searchParams.get('q');
+          const lat = url.searchParams.get('lat');
+          const lon = url.searchParams.get('lon');
+
+          // Reverse geocoding local
+          if (lat && lon) {
+            try {
+              const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&addressdetails=1&email=suporte@driversaas.app`;
+              const osmRes = await fetch(revUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                  'Referer': 'http://localhost:3000'
+                }
+              });
+              let revData = {};
+              if (osmRes.ok) {
+                revData = await osmRes.json();
+              }
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(revData || {}));
+              return;
+            } catch (e) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({}));
+              return;
+            }
+          }
+
           if (!q) {
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify([]));
@@ -59,6 +86,6 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
-    open: false
+    host: '0.0.0.0'
   }
 });
