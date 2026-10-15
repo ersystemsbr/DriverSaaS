@@ -27,10 +27,10 @@ export default function RealMap({
         attributionControl: false
       });
 
-      // CartoDB Dark Matter (Tiles em Dark Mode elegantes e gratuitos)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      // OpenStreetMap Oficial (100% Gratuito, Sem necessidade de API Key)
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
 
       // Adiciona controle de zoom no canto inferior direito
@@ -48,7 +48,7 @@ export default function RealMap({
     const effectiveDriverCoords = driverCoords || center;
     const carIconHtml = `
       <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-        ${isOnline ? '<div style="position: absolute; width: 44px; height: 44px; border-radius: 9999px; background: rgba(34, 197, 94, 0.25); border: 1.5px solid #22c55e; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>' : ''}
+        ${isOnline ? '<div style="position: absolute; width: 44px; height: 44px; border-radius: 9999px; background: rgba(34, 197, 94, 0.35); border: 1.5px solid #22c55e; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>' : ''}
         <div style="width: 32px; height: 32px; border-radius: 12px; background: ${isOnline ? '#22c55e' : '#3f3f46'}; color: #000; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.5); border: 2px solid #fff;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
@@ -68,8 +68,9 @@ export default function RealMap({
     });
 
     if (effectiveDriverCoords) {
-      L.marker([effectiveDriverCoords[0] || effectiveDriverCoords.lat, effectiveDriverCoords[1] || effectiveDriverCoords.lng], { icon: carIcon })
-        .addTo(layerGroup);
+      const lat = effectiveDriverCoords.lat || effectiveDriverCoords[0];
+      const lng = effectiveDriverCoords.lng || effectiveDriverCoords[1];
+      L.marker([lat, lng], { icon: carIcon }).addTo(layerGroup);
     }
 
     // 2. Marcador de Ponto de Embarque (Origem)
@@ -118,11 +119,11 @@ export default function RealMap({
         lineJoin: 'round'
       }).addTo(layerGroup);
 
-      // Linha de contorno externa para efeito neon
+      // Linha de contorno externa
       L.polyline(routeCoordinates, {
         color: '#15803d',
         weight: 9,
-        opacity: 0.35,
+        opacity: 0.4,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(layerGroup);
@@ -132,13 +133,15 @@ export default function RealMap({
         map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
       } catch (e) {}
     } else if (effectiveDriverCoords) {
-      map.setView([effectiveDriverCoords[0] || effectiveDriverCoords.lat, effectiveDriverCoords[1] || effectiveDriverCoords.lng], zoom);
+      const lat = effectiveDriverCoords.lat || effectiveDriverCoords[0];
+      const lng = effectiveDriverCoords.lng || effectiveDriverCoords[1];
+      map.setView([lat, lng], zoom);
     }
 
   }, [center, zoom, originCoords, destCoords, routeCoordinates, driverCoords, isOnline]);
 
   return (
-    <div className="relative w-full rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl bg-[#121215]">
+    <div className="relative w-full rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl bg-[#121215] dark-osm-map">
       <div 
         ref={mapContainerRef} 
         style={{ height, width: '100%' }}

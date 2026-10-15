@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { User, Phone, Mail, Lock, ShieldCheck, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { User, Phone, Mail, Lock, ShieldCheck, ArrowRight, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { registerPassengerUser } from '../services/storageService';
 
 export default function RegisterPassenger({ onRegisterSuccess, setActivePage }) {
   const [formData, setFormData] = useState({
@@ -12,13 +13,14 @@ export default function RegisterPassenger({ onRegisterSuccess, setActivePage }) 
   });
 
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (field, val) => {
     setFormData(prev => ({ ...prev, [field]: val }));
     setErrorMsg('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.phone || !formData.email || !formData.password) {
       setErrorMsg('Preencha todos os campos obrigatórios.');
@@ -30,15 +32,22 @@ export default function RegisterPassenger({ onRegisterSuccess, setActivePage }) 
       return;
     }
 
-    onRegisterSuccess({
-      name: formData.name,
-      phone: formData.phone,
-      email: formData.email,
-      cpf: formData.cpf,
-      role: 'passenger'
-    });
-
-    setActivePage('passenger_home');
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      const res = await registerPassengerUser(formData);
+      if (res.success) {
+        onRegisterSuccess(res.user);
+        setActivePage('passenger_home');
+      } else {
+        setErrorMsg(res.error || 'Erro ao realizar cadastro.');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Erro ao salvar cadastro do passageiro.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -159,10 +168,20 @@ export default function RegisterPassenger({ onRegisterSuccess, setActivePage }) 
 
           <button
             type="submit"
-            className="w-full py-3.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
+            disabled={isSubmitting}
+            className="w-full py-3.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            <span>Cadastrar e Começar a Usar</span>
-            <ArrowRight className="w-4 h-4" />
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Cadastrando...</span>
+              </>
+            ) : (
+              <>
+                <span>Cadastrar e Começar a Usar</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
 
         </form>

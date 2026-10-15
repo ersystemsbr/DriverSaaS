@@ -17,23 +17,58 @@ import PassengerHome from './pages/PassengerHome';
 import AdminDashboard from './pages/AdminDashboard';
 
 // Mock Data
-import { INITIAL_DRIVER, INITIAL_PLANS, INITIAL_RIDES_HISTORY } from './data/mockData';
+import { INITIAL_RIDES_HISTORY } from './data/mockData';
+import { 
+  getDriverProfile, 
+  saveDriverProfile, 
+  getStoredPlans, 
+  saveStoredPlans, 
+  getStoredSession, 
+  clearStoredSession 
+} from './services/storageService';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null); // null quando deslogado
-  const [currentRole, setCurrentRole] = useState('driver'); // 'driver', 'passenger', 'admin'
+  const [currentUser, setCurrentUser] = useState(() => getStoredSession());
+  const [currentRole, setCurrentRole] = useState(() => {
+    const session = getStoredSession();
+    return session?.role || 'driver';
+  });
   const [selectedLoginRole, setSelectedLoginRole] = useState('driver');
-  const [activePage, setActivePage] = useState('home'); // Começa na Landing Page 'home'
+  const [activePage, setActivePage] = useState(() => {
+    const session = getStoredSession();
+    if (session) {
+      if (session.role === 'driver') return 'driver_dashboard';
+      if (session.role === 'passenger') return 'passenger_home';
+      if (session.role === 'admin') return 'admin_dashboard';
+    }
+    return 'home';
+  });
   
-  // Central State
-  const [driver, setDriver] = useState(INITIAL_DRIVER);
-  const [plans, setPlans] = useState(INITIAL_PLANS);
+  // Central State Persistente
+  const [driver, setDriver] = useState(() => getDriverProfile());
+  const [plans, setPlans] = useState(() => getStoredPlans());
   const [ridesHistory, setRidesHistory] = useState(INITIAL_RIDES_HISTORY);
   const [currentRide, setCurrentRide] = useState(null);
 
-  const handleLogin = (user) => {
+  const updateDriver = (driverOrUpdater) => {
+    setDriver(prev => {
+      const updated = typeof driverOrUpdater === 'function' ? driverOrUpdater(prev) : driverOrUpdater;
+      saveDriverProfile(updated);
+      return updated;
+    });
+  };
+
+  const updatePlans = (newPlans) => {
+    setPlans(newPlans);
+    saveStoredPlans(newPlans);
+  };
+
+  const handleLogin = (user, driverData = null) => {
     setCurrentUser(user);
     setCurrentRole(user.role);
+    if (driverData) {
+      updateDriver(driverData);
+    }
     if (user.role === 'driver') {
       setActivePage('driver_dashboard');
     } else if (user.role === 'passenger') {
@@ -44,6 +79,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    clearStoredSession();
     setCurrentUser(null);
     setActivePage('home');
   };
@@ -104,7 +140,7 @@ export default function App() {
         {activePage === 'onboarding' && (
           <OnboardingDriver
             driver={driver}
-            setDriver={setDriver}
+            setDriver={updateDriver}
             setActivePage={setActivePage}
             onRegisterSuccess={handleRegisterDriverSuccess}
           />
@@ -113,7 +149,7 @@ export default function App() {
         {activePage === 'driver_dashboard' && (
           <DriverDashboard
             driver={driver}
-            setDriver={setDriver}
+            setDriver={updateDriver}
             setActivePage={setActivePage}
             setCurrentRide={setCurrentRide}
           />
@@ -122,7 +158,7 @@ export default function App() {
         {activePage === 'subscription' && (
           <Subscription
             driver={driver}
-            setDriver={setDriver}
+            setDriver={updateDriver}
             plans={plans}
             setActivePage={setActivePage}
           />
@@ -131,7 +167,7 @@ export default function App() {
         {activePage === 'wallet' && (
           <Wallet
             driver={driver}
-            setDriver={setDriver}
+            setDriver={updateDriver}
           />
         )}
 
@@ -139,7 +175,7 @@ export default function App() {
           <RideInProgress
             currentRide={currentRide}
             driver={driver}
-            setDriver={setDriver}
+            setDriver={updateDriver}
             setRidesHistory={setRidesHistory}
             setActivePage={setActivePage}
           />
@@ -155,7 +191,7 @@ export default function App() {
         {activePage === 'driver_profile' && (
           <DriverProfile
             driver={driver}
-            setDriver={setDriver}
+            setDriver={updateDriver}
             setActivePage={setActivePage}
           />
         )}
@@ -165,13 +201,14 @@ export default function App() {
             driver={driver}
             setActivePage={setActivePage}
             setCurrentRide={setCurrentRide}
+            currentUser={currentUser}
           />
         )}
 
         {activePage === 'admin_dashboard' && (
           <AdminDashboard
             plans={plans}
-            setPlans={setPlans}
+            setPlans={updatePlans}
             setActivePage={setActivePage}
           />
         )}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Car, User, Lock, Mail, ArrowRight, ShieldCheck, KeyRound, AlertCircle } from 'lucide-react';
+import { Car, User, Lock, Mail, ArrowRight, ShieldCheck, KeyRound, AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import { authenticateUser } from '../services/storageService';
 
 export default function Login({ 
   onLogin, 
@@ -11,6 +12,7 @@ export default function Login({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Acesso Secreto Admin
   const [secretClickCount, setSecretClickCount] = useState(0);
@@ -18,27 +20,47 @@ export default function Login({
   const [adminPin, setAdminPin] = useState('');
   const [adminError, setAdminError] = useState('');
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       setErrorMsg('Preencha seu e-mail e senha.');
       return;
     }
 
-    // Login normal
-    onLogin({
-      email,
-      role,
-      name: role === 'driver' ? 'Carlos Alberto Silva' : 'Mariana Albuquerque'
-    });
+    setIsSubmitting(true);
+    setErrorMsg('');
 
-    if (role === 'driver') {
-      setCurrentRole('driver');
-      setActivePage('driver_dashboard');
-    } else {
-      setCurrentRole('passenger');
-      setActivePage('passenger_home');
+    try {
+      const res = await authenticateUser(email, password, role);
+      if (res.success) {
+        onLogin(res.user, res.driver);
+        if (role === 'driver') {
+          setCurrentRole('driver');
+          setActivePage('driver_dashboard');
+        } else {
+          setCurrentRole('passenger');
+          setActivePage('passenger_home');
+        }
+      } else {
+        setErrorMsg(res.error || 'Credenciais inválidas.');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Erro ao autenticar. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleFillDemo = () => {
+    if (role === 'driver') {
+      setEmail('carlos.transporte@gmail.com');
+      setPassword('123');
+    } else {
+      setEmail('mariana.passageira@gmail.com');
+      setPassword('123');
+    }
+    setErrorMsg('');
   };
 
   // Gatilho secreto: 5 cliques no texto da versão ou no ícone do cadeado
@@ -169,16 +191,38 @@ export default function Login({
             </div>
           )}
 
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={handleFillDemo}
+              className="text-[11px] text-zinc-400 hover:text-green-400 flex items-center gap-1 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Preencher conta de teste</span>
+            </button>
+            <span className="text-[10px] text-zinc-600">Senha: 123</span>
+          </div>
+
           <button
             type="submit"
-            className={`w-full py-3.5 rounded-xl font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 ${
+            disabled={isSubmitting}
+            className={`w-full py-3.5 rounded-xl font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 ${
               role === 'driver'
                 ? 'bg-green-500 hover:bg-green-600 text-black shadow-green-500/20'
                 : 'bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/20'
             }`}
           >
-            <span>Entrar na Plataforma</span>
-            <ArrowRight className="w-4 h-4" />
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Entrando...</span>
+              </>
+            ) : (
+              <>
+                <span>Entrar na Plataforma</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
 
         </form>

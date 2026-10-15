@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Shield, Car, DollarSign, Save, CheckCircle2, Building2 } from 'lucide-react';
 
 export default function DriverProfile({ driver, setDriver, setActivePage }) {
   const [profileData, setProfileData] = useState({ ...driver });
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setProfileData({ ...driver });
+  }, [driver]);
 
   const handleChange = (field, val) => {
     setProfileData(prev => ({ ...prev, [field]: val }));

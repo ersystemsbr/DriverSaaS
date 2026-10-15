@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { ShieldCheck, User, Car, DollarSign, ArrowRight, ArrowLeft, CheckCircle2, Building2 } from 'lucide-react';
+import { ShieldCheck, User, Car, DollarSign, ArrowRight, ArrowLeft, CheckCircle2, Building2, Loader2 } from 'lucide-react';
+import { registerDriverUser } from '../services/storageService';
 
 export default function OnboardingDriver({ driver, setDriver, setActivePage, onRegisterSuccess }) {
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     full_name: driver.full_name || '',
     phone: driver.phone || '',
@@ -59,23 +61,31 @@ export default function OnboardingDriver({ driver, setDriver, setActivePage, onR
     setStep(prev => prev + 1);
   };
 
-  const handleFinish = () => {
-    const updatedDriver = {
-      ...driver,
-      ...formData,
-      base_price: parseFloat(formData.base_price),
-      price_per_km: parseFloat(formData.price_per_km)
-    };
-    setDriver(updatedDriver);
-    if (onRegisterSuccess) {
-      onRegisterSuccess({
-        name: formData.full_name,
-        email: formData.email,
-        phone: formData.phone,
-        role: 'driver'
+  const handleFinish = async () => {
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      const res = await registerDriverUser({
+        ...formData,
+        base_price: parseFloat(formData.base_price),
+        price_per_km: parseFloat(formData.price_per_km)
       });
+
+      if (res.success) {
+        setDriver(res.driver);
+        if (onRegisterSuccess) {
+          onRegisterSuccess(res.user);
+        }
+        setActivePage('driver_dashboard');
+      } else {
+        setErrorMsg(res.error || 'Erro ao salvar cadastro.');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Erro ao salvar cadastro do motorista no banco de dados.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setActivePage('driver_dashboard');
   };
 
   const progressPercent = Math.round((step / 4) * 100);
@@ -390,10 +400,20 @@ export default function OnboardingDriver({ driver, setDriver, setActivePage, onR
           ) : (
             <button
               onClick={handleFinish}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-600 hover:to-emerald-500 text-black text-xs font-extrabold flex items-center gap-2 shadow-xl shadow-green-500/30 transition-all ml-auto"
+              disabled={isSubmitting}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-600 hover:to-emerald-500 text-black text-xs font-extrabold flex items-center gap-2 shadow-xl shadow-green-500/30 transition-all ml-auto disabled:opacity-60"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Concluir Cadastro</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Salvando Dados...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Concluir Cadastro</span>
+                </>
+              )}
             </button>
           )}
         </div>

@@ -15,11 +15,11 @@ import {
   CheckCircle2,
   XCircle
 } from 'lucide-react';
-import { INITIAL_ALL_DRIVERS_ADMIN } from '../data/mockData';
+import { getAdminDrivers, saveAdminDrivers } from '../services/storageService';
 
 export default function AdminDashboard({ plans, setPlans, setActivePage }) {
   const [editablePlans, setEditablePlans] = useState(JSON.parse(JSON.stringify(plans)));
-  const [driversList, setDriversList] = useState(INITIAL_ALL_DRIVERS_ADMIN);
+  const [driversList, setDriversList] = useState(() => getAdminDrivers());
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handlePriceChange = (planId, newPrice) => {
@@ -39,22 +39,30 @@ export default function AdminDashboard({ plans, setPlans, setActivePage }) {
   };
 
   const handleToggleDriverStatus = (driverId) => {
-    setDriversList(prev => prev.map(d => {
-      if (d.id === driverId) {
-        const nextStatus = d.status === 'active' ? 'suspended' : 'active';
-        return { ...d, status: nextStatus };
-      }
-      return d;
-    }));
+    setDriversList(prev => {
+      const updated = prev.map(d => {
+        if (d.id === driverId) {
+          const nextStatus = d.status === 'active' ? 'suspended' : 'active';
+          return { ...d, status: nextStatus };
+        }
+        return d;
+      });
+      saveAdminDrivers(updated);
+      return updated;
+    });
   };
 
   const handleApproveDriver = (driverId) => {
-    setDriversList(prev => prev.map(d => {
-      if (d.id === driverId) {
-        return { ...d, status: 'active' };
-      }
-      return d;
-    }));
+    setDriversList(prev => {
+      const updated = prev.map(d => {
+        if (d.id === driverId) {
+          return { ...d, status: 'active' };
+        }
+        return d;
+      });
+      saveAdminDrivers(updated);
+      return updated;
+    });
   };
 
   return (
