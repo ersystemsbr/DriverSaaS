@@ -14,6 +14,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import RideContractModal from '../components/RideContractModal';
+import RealMap from '../components/RealMap';
 
 export default function RideInProgress({ currentRide, driver, setDriver, setRidesHistory, setActivePage }) {
   const [rideStage, setRideStage] = useState('on_the_way'); // 'on_the_way', 'in_trip', 'completed'
@@ -123,6 +124,14 @@ export default function RideInProgress({ currentRide, driver, setDriver, setRide
           Ver Contrato PJ
         </button>
       </div>
+
+      {/* Rota no Mapa Real */}
+      <RealMap 
+        height="220px"
+        isOnline={true}
+        originCoords={{ lat: -23.561684, lng: -46.655981 }}
+        destCoords={{ lat: -23.610214, lng: -46.666872 }}
+      />
 
       {/* Trip Stage Progress */}
       <div className="grid grid-cols-2 gap-2 p-1.5 bg-zinc-950 border border-zinc-800 rounded-2xl">

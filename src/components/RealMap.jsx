@@ -1,0 +1,149 @@
+import React, { useEffect, useRef } from 'react';
+import L from 'leaflet';
+
+export default function RealMap({ 
+  center = [-23.561684, -46.655981], // São Paulo centro padrão
+  zoom = 14,
+  originCoords = null,
+  destCoords = null,
+  routeCoordinates = null,
+  driverCoords = null,
+  isOnline = false,
+  height = '320px'
+}) {
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const layerGroupRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    // Inicializa o mapa Leaflet se ainda não existir
+    if (!mapInstanceRef.current) {
+      const map = L.map(mapContainerRef.current, {
+        center: center,
+        zoom: zoom,
+        zoomControl: false,
+        attributionControl: false
+      });
+
+      // CartoDB Dark Matter (Tiles em Dark Mode elegantes e gratuitos)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+      }).addTo(map);
+
+      // Adiciona controle de zoom no canto inferior direito
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      layerGroupRef.current = L.layerGroup().addTo(map);
+      mapInstanceRef.current = map;
+    }
+
+    const map = mapInstanceRef.current;
+    const layerGroup = layerGroupRef.current;
+    layerGroup.clearLayers();
+
+    // 1. Marcador do Motorista com efeito de radar
+    const effectiveDriverCoords = driverCoords || center;
+    const carIconHtml = `
+      <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+        ${isOnline ? '<div style="position: absolute; width: 44px; height: 44px; border-radius: 9999px; background: rgba(34, 197, 94, 0.25); border: 1.5px solid #22c55e; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>' : ''}
+        <div style="width: 32px; height: 32px; border-radius: 12px; background: ${isOnline ? '#22c55e' : '#3f3f46'}; color: #000; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.5); border: 2px solid #fff;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+            <circle cx="7" cy="17" r="2"/>
+            <path d="M9 17h6"/>
+            <circle cx="17" cy="17" r="2"/>
+          </svg>
+        </div>
+      </div>
+    `;
+
+    const carIcon = L.divIcon({
+      html: carIconHtml,
+      className: 'custom-driver-icon',
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
+    });
+
+    if (effectiveDriverCoords) {
+      L.marker([effectiveDriverCoords[0] || effectiveDriverCoords.lat, effectiveDriverCoords[1] || effectiveDriverCoords.lng], { icon: carIcon })
+        .addTo(layerGroup);
+    }
+
+    // 2. Marcador de Ponto de Embarque (Origem)
+    if (originCoords) {
+      const originIcon = L.divIcon({
+        html: `
+          <div style="background: #22c55e; color: #000; width: 28px; height: 28px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+            A
+          </div>
+        `,
+        className: 'origin-marker',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      L.marker([originCoords.lat, originCoords.lng], { icon: originIcon })
+        .addTo(layerGroup)
+        .bindPopup('Ponto de Partida');
+    }
+
+    // 3. Marcador de Destino
+    if (destCoords) {
+      const destIcon = L.divIcon({
+        html: `
+          <div style="background: #3b82f6; color: #fff; width: 28px; height: 28px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+            B
+          </div>
+        `,
+        className: 'dest-marker',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      L.marker([destCoords.lat, destCoords.lng], { icon: destIcon })
+        .addTo(layerGroup)
+        .bindPopup('Destino Final');
+    }
+
+    // 4. Polilinha da Rota Real traçada pelas ruas
+    if (routeCoordinates && routeCoordinates.length > 0) {
+      const polyline = L.polyline(routeCoordinates, {
+        color: '#22c55e',
+        weight: 5,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(layerGroup);
+
+      // Linha de contorno externa para efeito neon
+      L.polyline(routeCoordinates, {
+        color: '#15803d',
+        weight: 9,
+        opacity: 0.35,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(layerGroup);
+
+      // Ajusta o zoom automaticamente para enquadrar a rota inteira
+      try {
+        map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+      } catch (e) {}
+    } else if (effectiveDriverCoords) {
+      map.setView([effectiveDriverCoords[0] || effectiveDriverCoords.lat, effectiveDriverCoords[1] || effectiveDriverCoords.lng], zoom);
+    }
+
+  }, [center, zoom, originCoords, destCoords, routeCoordinates, driverCoords, isOnline]);
+
+  return (
+    <div className="relative w-full rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl bg-[#121215]">
+      <div 
+        ref={mapContainerRef} 
+        style={{ height, width: '100%' }}
+        className="z-10"
+      />
+    </div>
+  );
+}

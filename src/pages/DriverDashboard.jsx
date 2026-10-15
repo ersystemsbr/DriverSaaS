@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Power, 
   Wallet, 
@@ -15,23 +15,81 @@ import {
   Car,
   ChevronRight,
   Radio,
-  Play
+  Play,
+  Navigation
 } from 'lucide-react';
-import RadarMap from '../components/RadarMap';
+import RealMap from '../components/RealMap';
+import { getDeviceLocation } from '../services/mapService';
+import { subscribeToNewRides } from '../services/supabase';
 
 export default function DriverDashboard({ driver, setDriver, setActivePage, setCurrentRide }) {
   const [isOnline, setIsOnline] = useState(false);
   const [incomingRide, setIncomingRide] = useState(null);
   const [notificationMsg, setNotificationMsg] = useState('');
+  const [driverCoords, setDriverCoords] = useState({ lat: -23.561684, lng: -46.655981 });
 
   const isSubActive = driver.subscription_status === 'active';
+
+  // 1. Detectar GPS real do motorista no carregamento
+  useEffect(() => {
+    getDeviceLocation().then((coords) => {
+      setDriverCoords(coords);
+    });
+  }, []);
+
+  // 2. Escutar chamadas de passageiros em tempo real quando estiver online
+  useEffect(() => {
+    if (!isOnline) return;
+
+    const unsubscribe = subscribeToNewRides((newRide) => {
+      setIncomingRide({
+        id: newRide.id || `ride_${Date.now().toString().slice(-4)}`,
+        passenger_name: newRide.passenger_name || "Mariana Albuquerque",
+        passenger_phone: newRide.passenger_phone || "(11) 98877-6655",
+        origin: newRide.origin_address || newRide.origin,
+        destination: newRide.destination_address || newRide.destination,
+        distance_km: newRide.distance_km || 8.5,
+        duration_min: newRide.duration_min || 20,
+        total_price: newRide.total_price || 42.00,
+        payment_method: newRide.payment_method || "Pix Direto",
+        date: newRide.created_at || newRide.date || new Date().toISOString()
+      });
+
+      // Alerta sonoro sutil via Web Audio API e vibração
+      playChime();
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [isOnline]);
+
+  const playChime = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3); // A5
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {}
+  };
 
   const showToast = (msg) => {
     setNotificationMsg(msg);
     setTimeout(() => setNotificationMsg(''), 3000);
   };
 
-  const handleToggleOnline = () => {
+  const handleToggleOnline = async () => {
     if (!isSubActive) {
       showToast('Sua assinatura está inativa. Renove seu plano para ficar online.');
       setActivePage('subscription');
@@ -40,15 +98,14 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
 
     const nextState = !isOnline;
     setIsOnline(nextState);
-    showToast(nextState ? 'Você está ONLINE! Aguardando chamadas de passageiros...' : 'Você está offline.');
-    
-    // Auto-simulate an incoming ride when online after 3 seconds if none active
+
     if (nextState) {
-      setTimeout(() => {
-        triggerSimulatedRide();
-      }, 2500);
+      const coords = await getDeviceLocation();
+      setDriverCoords(coords);
+      showToast('Você está ONLINE! Aguardando chamadas de passageiros com GPS ativo...');
     } else {
       setIncomingRide(null);
+      showToast('Você está offline.');
     }
   };
 
@@ -65,6 +122,7 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
       payment_method: "Pix Direto",
       date: new Date().toISOString()
     });
+    playChime();
   };
 
   const handleAcceptRide = () => {
@@ -167,12 +225,24 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
           </div>
         )}
 
-        {/* Radar Map Simulator */}
-        <RadarMap 
-          isOnline={isOnline} 
-          driverName={driver.full_name} 
-          carModel={driver.car_model} 
-        />
+        {/* MAPA REAL LEAFLET COM RADAR E GPS */}
+        <div className="space-y-2">
+          <RealMap 
+            center={[driverCoords.lat, driverCoords.lng]}
+            driverCoords={driverCoords}
+            isOnline={isOnline}
+            zoom={14}
+            height="260px"
+          />
+
+          <div className="flex items-center justify-between text-[11px] text-zinc-400 px-1">
+            <span className="flex items-center gap-1.5">
+              <Navigation className="w-3 h-3 text-green-400" />
+              GPS: {driverCoords.lat.toFixed(4)}, {driverCoords.lng.toFixed(4)}
+            </span>
+            <span>Status: <strong className={isOnline ? "text-green-400" : "text-zinc-500"}>{isOnline ? "Aguardando Passageiros" : "Desconectado"}</strong></span>
+          </div>
+        </div>
 
         {/* Incoming Ride Card Modal Alert */}
         {incomingRide && (
@@ -181,18 +251,18 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-bold flex items-center gap-1.5 animate-pulse">
                 <Radio className="w-3.5 h-3.5" />
-                Nova Corrida Solicitada! (Taxa 0%)
+                Nova Corrida em Tempo Real!
               </span>
-              <span className="text-xs text-zinc-400 font-mono">100% seu lucro</span>
+              <span className="text-xs text-zinc-400 font-mono">100% Taxa Zero</span>
             </div>
 
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-extrabold text-white">{incomingRide.passenger_name}</h3>
-                <p className="text-xs text-zinc-400">Passageiro Particular de Confiança ★ 4.9</p>
+                <p className="text-xs text-zinc-400">{incomingRide.passenger_phone} • Cliente Particular</p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-green-400">R$ {incomingRide.total_price.toFixed(2)}</span>
+                <span className="text-2xl font-black text-green-400">R$ {parseFloat(incomingRide.total_price).toFixed(2)}</span>
                 <p className="text-[11px] text-zinc-500">Via {incomingRide.payment_method}</p>
               </div>
             </div>
@@ -300,14 +370,14 @@ export default function DriverDashboard({ driver, setDriver, setActivePage, setC
 
         </div>
 
-        {/* Simulator Helper button for testing */}
+        {/* Botão de teste rápido de recebimento */}
         {!incomingRide && isOnline && (
           <div className="text-center pt-2">
             <button
               onClick={triggerSimulatedRide}
               className="text-xs text-zinc-500 hover:text-green-400 underline transition-colors"
             >
-              Testar recepção imediata de nova corrida
+              Testar alerta sonoro de nova chamada
             </button>
           </div>
         )}
